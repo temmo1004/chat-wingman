@@ -11,68 +11,110 @@ import android.os.Looper
 import android.util.DisplayMetrics
 
 /**
- * 用 MediaProjection 抓一張當前螢幕。單次擷取 → 回 Bitmap。
- *
- * 注意（Android 14）：
- * - 必須先啟動 foregroundServiceType=mediaProjection 的前景服務，才能 getMediaProjection()
- * - 每次取得投影都要重新經使用者同意（見 MainActivity 流程）
- * - 用完記得 release()
+ * 在同一個 MediaProjection session 上保留一個 VirtualDisplay，按需擷取單幀。
+ * Android 14 起同一個 MediaProjection 只能建立一次 VirtualDisplay，因此不能每次點球重建。
  */
 class ScreenCaptureManager(
     private val projection: MediaProjection,
     private val metrics: DisplayMetrics,
+    private val onProjectionStopped: () -> Unit,
 ) {
     private val handler = Handler(Looper.getMainLooper())
     private var imageReader: ImageReader? = null
     private var virtualDisplay: VirtualDisplay? = null
+    private var captureInProgress = false
+    private var stopped = false
+    private var stopNotified = false
 
     init {
-        // Android 14+ 要求註冊 callback，否則 getMediaProjection 之後會擲例外
-        projection.registerCallback(object : MediaProjection.Callback() {}, handler)
+        projection.registerCallback(
+            object : MediaProjection.Callback() {
+                override fun onStop() {
+                    handleProjectionStopped()
+                }
+            },
+            handler,
+        )
+        createCaptureSurface()
     }
 
-    /** 擷取一張畫面。onResult 在主執行緒回呼。 */
-    fun captureOnce(onResult: (Bitmap?) -> Unit) {
-        val w = metrics.widthPixels
-        val h = metrics.heightPixels
-        val reader = ImageReader.newInstance(w, h, PixelFormat.RGBA_8888, 2)
+    private fun createCaptureSurface() {
+        val width = metrics.widthPixels
+        val height = metrics.heightPixels
+        val reader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2)
         imageReader = reader
-
         virtualDisplay = projection.createVirtualDisplay(
             "wingman-capture",
-            w, h, metrics.densityDpi,
+            width,
+            height,
+            metrics.densityDpi,
             DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-            reader.surface, null, handler,
+            reader.surface,
+            null,
+            handler,
         )
+    }
 
-        reader.setOnImageAvailableListener({ r ->
-            val image = r.acquireLatestImage() ?: return@setOnImageAvailableListener
+    /** 擷取一張畫面；重複點擊時沿用同一個 VirtualDisplay。 */
+    fun captureOnce(onResult: (Bitmap?) -> Unit) {
+        val reader = imageReader
+        if (stopped || reader == null || captureInProgress) {
+            handler.post { onResult(null) }
+            return
+        }
+
+        runCatching { reader.acquireLatestImage()?.close() }
+        captureInProgress = true
+        reader.setOnImageAvailableListener({ availableReader ->
+            val image = availableReader.acquireLatestImage()
+                ?: return@setOnImageAvailableListener
+            val width = metrics.widthPixels
+            val height = metrics.heightPixels
             val bitmap = try {
                 val plane = image.planes[0]
-                val rowPadding = plane.rowStride - plane.pixelStride * w
-                val bmp = Bitmap.createBitmap(
-                    w + rowPadding / plane.pixelStride, h, Bitmap.Config.ARGB_8888,
+                val rowPadding = plane.rowStride - plane.pixelStride * width
+                val padded = Bitmap.createBitmap(
+                    width + rowPadding / plane.pixelStride,
+                    height,
+                    Bitmap.Config.ARGB_8888,
                 )
-                bmp.copyPixelsFromBuffer(plane.buffer)
-                Bitmap.createBitmap(bmp, 0, 0, w, h) // 裁掉 row padding
-            } catch (e: Exception) {
+                padded.copyPixelsFromBuffer(plane.buffer)
+                Bitmap.createBitmap(padded, 0, 0, width, height).also {
+                    if (it !== padded) padded.recycle()
+                }
+            } catch (_: Exception) {
                 null
             } finally {
                 image.close()
             }
-            // 一次性：抓到就收工，避免連續回呼
-            r.setOnImageAvailableListener(null, null)
-            handler.post { onResult(bitmap); teardown() }
+
+            availableReader.setOnImageAvailableListener(null, null)
+            captureInProgress = false
+            handler.post { onResult(bitmap) }
         }, handler)
     }
 
+    private fun handleProjectionStopped() {
+        if (stopNotified) return
+        stopNotified = true
+        stopped = true
+        captureInProgress = false
+        teardown()
+        onProjectionStopped()
+    }
+
     private fun teardown() {
-        virtualDisplay?.release(); virtualDisplay = null
-        imageReader?.close(); imageReader = null
+        imageReader?.setOnImageAvailableListener(null, null)
+        virtualDisplay?.release()
+        virtualDisplay = null
+        imageReader?.close()
+        imageReader = null
     }
 
     fun release() {
-        teardown()
-        projection.stop()
+        if (!stopped) {
+            runCatching { projection.stop() }
+        }
+        handleProjectionStopped()
     }
 }

@@ -4,6 +4,7 @@ import android.accessibilityservice.AccessibilityService
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.graphics.Rect
 import android.os.Bundle
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -32,7 +33,7 @@ class WingmanAccessibilityService : AccessibilityService() {
     /** 把回覆填進當前聊天輸入框。回傳是否成功。 */
     fun fillReply(text: String): Boolean {
         val root = rootInActiveWindow ?: return false
-        val field = findEditable(root) ?: return false
+        val field = pickInputField(root) ?: return false
 
         // 1) 優先 ACTION_SET_TEXT
         val args = Bundle().apply {
@@ -47,14 +48,32 @@ class WingmanAccessibilityService : AccessibilityService() {
         return field.performAction(AccessibilityNodeInfo.ACTION_PASTE)
     }
 
-    /** 深度優先找第一個可編輯節點（通常就是聊天輸入框）。 */
-    private fun findEditable(node: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
-        if (node == null) return null
-        if (node.isEditable && node.isEnabled) return node
-        for (i in 0 until node.childCount) {
-            findEditable(node.getChild(i))?.let { return it }
+    /**
+     * 一個聊天畫面可能同時有多個 EditText（甚至有不可見的誘餌節點）。
+     * 優先使用已聚焦輸入框，否則選擇可見、啟用且面積最大的可編輯節點。
+     */
+    private fun pickInputField(root: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)?.let {
+            if (it.isEditable && it.isEnabled) return it
         }
-        return null
+
+        val candidates = ArrayList<AccessibilityNodeInfo>()
+        collectEditable(root, candidates)
+        val visible = candidates.filter { it.isVisibleToUser && it.isEnabled }
+        return (visible.ifEmpty { candidates }).maxByOrNull { node ->
+            val bounds = Rect()
+            node.getBoundsInScreen(bounds)
+            bounds.width().toLong() * bounds.height()
+        }
+    }
+
+    private fun collectEditable(
+        node: AccessibilityNodeInfo?,
+        out: MutableList<AccessibilityNodeInfo>,
+    ) {
+        if (node == null) return
+        if (node.isEditable) out.add(node)
+        for (i in 0 until node.childCount) collectEditable(node.getChild(i), out)
     }
 
     companion object {

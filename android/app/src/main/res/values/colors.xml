@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="launcher_icon_background">#F9E9D3</color>
+    <color name="wingman_warm_white">#FFF9F3</color>
+    <color name="wingman_orange">#BE3D16</color>
+    <color name="wingman_caramel">#9B5E32</color>
 </resources>

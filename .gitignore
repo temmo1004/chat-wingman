@@ -1,0 +1,9 @@
+# Machine-local Android SDK used for command-line builds.
+/.android-sdk/
+
+# Generated UI research output; product tokens live in WingmanTheme.kt.
+/design-system/
+
+# Local PR drafting files and macOS metadata.
+/.pr-body-*.md
+.DS_Store

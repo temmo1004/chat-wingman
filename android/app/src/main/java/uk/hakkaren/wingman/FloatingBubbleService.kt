@@ -12,10 +12,12 @@ import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.os.IBinder
+import android.provider.Settings
 import android.util.DisplayMetrics
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.ViewOutlineProvider
 import android.view.WindowManager
 import android.widget.ImageView
@@ -23,6 +25,7 @@ import android.widget.Toast
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
@@ -45,19 +48,42 @@ class FloatingBubbleService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         startForeground(NOTIF_ID, buildNotification())
 
-        // 從 MainActivity 拿 MediaProjection 授權結果，建立擷取器
-        if (capture == null && intent != null) {
+        // 從 MainActivity 拿 MediaProjection 授權結果，建立本次唯一的擷取 session。
+        if (intent != null) {
             val resultCode = intent.getIntExtra(EXTRA_RESULT_CODE, 0)
             val data = intent.getParcelableExtra<Intent>(EXTRA_DATA)
             if (resultCode != 0 && data != null) {
-                val mpm = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-                val projection: MediaProjection = mpm.getMediaProjection(resultCode, data)
-                capture = ScreenCaptureManager(projection, displayMetrics())
+                runCatching {
+                    val manager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+                    val projection: MediaProjection = manager.getMediaProjection(resultCode, data)
+                    replaceCaptureSession(projection)
+                }.onFailure {
+                    CaptureSessionStatus.setActive(false)
+                    Toast.makeText(this, "螢幕擷取啟動失敗，請重新授權", Toast.LENGTH_SHORT).show()
+                }
             }
         }
 
-        if (bubble == null) showBubble()
+        if (bubble == null && Settings.canDrawOverlays(this)) showBubble()
         return START_STICKY
+    }
+
+    private fun replaceCaptureSession(projection: MediaProjection) {
+        lateinit var nextCapture: ScreenCaptureManager
+        nextCapture = ScreenCaptureManager(
+            projection = projection,
+            metrics = displayMetrics(),
+            onProjectionStopped = {
+                if (capture === nextCapture) {
+                    capture = null
+                    CaptureSessionStatus.setActive(false)
+                }
+            },
+        )
+        val previousCapture = capture
+        capture = nextCapture
+        CaptureSessionStatus.setActive(true)
+        previousCapture?.release()
     }
 
     private fun displayMetrics(): DisplayMetrics =
@@ -67,9 +93,10 @@ class FloatingBubbleService : Service() {
 
     // ── 浮動球 ────────────────────────────────────────────
     private fun showBubble() {
+        if (!Settings.canDrawOverlays(this)) return
         wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         val view = ImageView(this).apply {
-            setImageResource(R.drawable.ic_launcher_foreground)
+            setImageResource(R.drawable.brand_kongming_hat)
             scaleType = ImageView.ScaleType.FIT_CENTER
             val iconPadding = (4 * resources.displayMetrics.density).toInt()
             setPadding(iconPadding, iconPadding, iconPadding, iconPadding)
@@ -91,24 +118,67 @@ class FloatingBubbleService : Service() {
             PixelFormat.TRANSLUCENT,
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = 24; y = 300
+            x = (24 * resources.displayMetrics.density).toInt()
+            y = (240 * resources.displayMetrics.density).toInt()
         }
 
-        // 拖曳 + 點擊判定
+        // 拖曳 + 短按截圖 + 長按系統相簿判定
+        val touchSlop = ViewConfiguration.get(this).scaledTouchSlop
         var downX = 0f; var downY = 0f; var lpX = 0; var lpY = 0
+        var dragged = false
+        var longPressed = false
+        val longPress = Runnable {
+            longPressed = true
+            openAlbum()
+        }
+        view.setOnClickListener { onBubbleTap() }
         view.setOnTouchListener { _, e ->
             when (e.action) {
                 MotionEvent.ACTION_DOWN -> {
-                    downX = e.rawX; downY = e.rawY; lpX = lp.x; lpY = lp.y; true
+                    downX = e.rawX; downY = e.rawY; lpX = lp.x; lpY = lp.y
+                    dragged = false
+                    longPressed = false
+                    view.postDelayed(longPress, ViewConfiguration.getLongPressTimeout().toLong())
+                    true
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    lp.x = lpX + (e.rawX - downX).toInt()
-                    lp.y = lpY + (e.rawY - downY).toInt()
+                    val moved = abs(e.rawX - downX) + abs(e.rawY - downY)
+                    if (moved > touchSlop) {
+                        dragged = true
+                        view.removeCallbacks(longPress)
+                    }
+                    val positionBounds = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        val metrics = wm.currentWindowMetrics
+                        val insets = metrics.windowInsets.getInsetsIgnoringVisibility(
+                            android.view.WindowInsets.Type.systemBars() or
+                                android.view.WindowInsets.Type.displayCutout(),
+                        )
+                        android.graphics.Rect(
+                            insets.left,
+                            insets.top,
+                            metrics.bounds.width() - insets.right,
+                            metrics.bounds.height() - insets.bottom,
+                        )
+                    } else {
+                        displayMetrics().run { android.graphics.Rect(0, 0, widthPixels, heightPixels) }
+                    }
+                    val minX = positionBounds.left
+                    val minY = positionBounds.top
+                    val maxX = (positionBounds.right - bubbleSize).coerceAtLeast(minX)
+                    val maxY = (positionBounds.bottom - bubbleSize).coerceAtLeast(minY)
+                    lp.x = (lpX + (e.rawX - downX).toInt()).coerceIn(minX, maxX)
+                    lp.y = (lpY + (e.rawY - downY).toInt()).coerceIn(minY, maxY)
                     wm.updateViewLayout(view, lp); true
                 }
                 MotionEvent.ACTION_UP -> {
+                    view.removeCallbacks(longPress)
                     val moved = abs(e.rawX - downX) + abs(e.rawY - downY)
-                    if (moved < 20) onBubbleTap()  // 幾乎沒移動 → 當作點擊
+                    if (moved > touchSlop) dragged = true
+                    if (!longPressed && !dragged) view.performClick()
+                    true
+                }
+                MotionEvent.ACTION_CANCEL -> {
+                    view.removeCallbacks(longPress)
                     true
                 }
                 else -> false
@@ -145,7 +215,11 @@ class FloatingBubbleService : Service() {
     private fun analyze(png: ByteArray?, demo: Boolean) {
         // DEMO_ONLY：完全不碰網路，直接用本地範本（後端未部署時 demo 用）
         if (BuildConfig.DEMO_ONLY) {
-            showPanel(LocalDemo.result)
+            showPanelLoading()
+            scope.launch {
+                delay(DEMO_LOADING_DELAY_MS)
+                showPanel(LocalDemo.result)
+            }
             return
         }
         showPanelLoading()
@@ -209,6 +283,14 @@ class FloatingBubbleService : Service() {
         }
     }
 
+    /** 長按浮動球時開啟免儲存權限的 Android 系統 Photo Picker。 */
+    private fun openAlbum() {
+        startActivity(
+            Intent(this, PickerActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }
+
     // ── 前景通知 ─────────────────────────────────────────
     private fun buildNotification(): Notification {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -218,22 +300,40 @@ class FloatingBubbleService : Service() {
         return Notification.Builder(this, CHANNEL)
             .setContentTitle("聊天軍師運作中")
             .setContentText("點孔明帽浮動球取得回覆建議")
-            .setSmallIcon(R.drawable.ic_bubble)
+            .setSmallIcon(R.drawable.ic_stat_kongming_hat)
             .build()
     }
 
+    override fun onCreate() {
+        super.onCreate()
+        instance = this
+    }
+
     override fun onDestroy() {
+        if (instance === this) instance = null
         bubble?.let { runCatching { wm.removeView(it) } }
         panel?.dismiss()
         capture?.release()
+        capture = null
+        CaptureSessionStatus.setActive(false)
         super.onDestroy()
     }
 
     companion object {
         private const val CHANNEL = "wingman"
         private const val NOTIF_ID = 1
+        private const val DEMO_LOADING_DELAY_MS = 600L
+        private const val ACTION_SHOW_BUBBLE = "uk.hakkaren.wingman.action.SHOW_BUBBLE"
         const val EXTRA_RESULT_CODE = "result_code"
         const val EXTRA_DATA = "data"
+
+        @Volatile
+        private var instance: FloatingBubbleService? = null
+
+        /** 由透明 PickerActivity 把使用者選到的聊天截圖送回現有分析面板。 */
+        fun analyzeAlbumImage(png: ByteArray) {
+            instance?.analyze(png, demo = false)
+        }
 
         fun start(ctx: Context, resultCode: Int, data: Intent) {
             val i = Intent(ctx, FloatingBubbleService::class.java).apply {
@@ -241,6 +341,13 @@ class FloatingBubbleService : Service() {
                 putExtra(EXTRA_DATA, data)
             }
             ctx.startForegroundService(i)
+        }
+
+        fun showBubble(ctx: Context) {
+            val intent = Intent(ctx, FloatingBubbleService::class.java).apply {
+                action = ACTION_SHOW_BUBBLE
+            }
+            ctx.startForegroundService(intent)
         }
     }
 }

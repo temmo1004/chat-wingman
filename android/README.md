@@ -1,4 +1,4 @@
-# Android — 聊天軍師浮動球
+# Android — 聊天軍師孔明帽浮動球
 
 Kotlin 原生。點浮動球 → MediaProjection 截圖 → 打後端 `/api/wingman` →
 面板顯示聊死指數 + 三風格卡片 → 點卡片用無障礙填字（退回複製剪貼簿）。

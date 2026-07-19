@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.ChatWingman" parent="Theme.Material3.Light.NoActionBar">
+        <item name="android:colorAccent">@color/wingman_orange</item>
+        <item name="android:navigationBarColor">@color/wingman_warm_white</item>
+        <item name="android:statusBarColor">@color/wingman_warm_white</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowBackground">@color/wingman_warm_white</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="colorPrimary">@color/wingman_orange</item>
+        <item name="colorSecondary">@color/wingman_caramel</item>
+    </style>
+</resources>

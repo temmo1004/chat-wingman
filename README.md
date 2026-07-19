@@ -1,4 +1,4 @@
-# 聊天軍師 Chat Wingman 🔮
+# 聊天軍師 Chat Wingman
 
 > 隊伍「四人行」— OpenAI Build Week Community Hackathon Taipei (2026-07-19)
 
@@ -14,7 +14,7 @@
 ```
 LINE 聊天中，快被句點
    ↓
-點浮動圓球 🔮
+點孔明帽浮動球
    ↓
 app 自動截取當前畫面（MediaProjection API）
    ↓
@@ -56,5 +56,5 @@ GPT-4o vision 讀圖 → 判讀語境
 ## 目錄
 
 - `backend/` — Flask `/api/wingman`（GPT-4o vision + demo 模式）
-- `android/` — Kotlin 浮動球 app（球 + 截圖 + 無障礙填字 + 面板）
+- `android/` — Kotlin 孔明帽浮動球 app（帽 + 截圖 + 無障礙填字 + 面板）
 - `ios/` — 捷徑建構指南 + 後端接點測試腳本
