@@ -57,7 +57,7 @@ class MainActivity : ComponentActivity() {
                     onCapturePermission = ::requestScreenCapture,
                     onAccessibilityPermission = ::openAccessibilitySettings,
                     onUnavailableTab = { tab ->
-                        Toast.makeText(this, "$tab將在下一版開放", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this, "${tab}將在下一版開放", Toast.LENGTH_SHORT).show()
                     },
                 )
             }
