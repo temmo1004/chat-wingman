@@ -17,7 +17,7 @@ android {
         // 後端位址；部署好把這裡換成公開 URL（見 backend/、docs/api.md）
         buildConfigField("String", "BACKEND_URL", "\"https://api.hakkaren.uk\"")
         // true = 完全走本地寫死範本、不碰網路（後端還沒部署時 demo 用）
-        buildConfigField("boolean", "DEMO_ONLY", "true")
+        buildConfigField("boolean", "DEMO_ONLY", "false")
     }
 
     buildFeatures {

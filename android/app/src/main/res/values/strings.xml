@@ -1,6 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">聊天軍師</string>
-    <string name="bubble_content_description">開啟聊天軍師分析</string>
-    <string name="accessibility_desc">開啟後，軍師可把建議的回覆直接填入聊天輸入框（送出仍由你手動按）。僅在你點擊浮動球時作用，不背景監控。</string>
+    <string name="bubble_content_description">孔明帽聊天軍師；點擊分析、長按選圖、拖曳移動</string>
+    <string name="accessibility_desc">開啟後，軍師可在你主動選擇回覆時，把文字填入目前的聊天輸入框。若填入失敗，會改用剪貼簿貼上或複製。訊息一律由你確認並手動送出；服務不會自動送出，也不會在背景監控對話。</string>
+    <string name="clipboard_label">聊天軍師回覆</string>
+    <string name="notification_channel_name">聊天軍師浮動球</string>
+    <string name="notification_title">聊天軍師運作中</string>
+    <string name="notification_text">點孔明帽浮動球取得回覆建議</string>
+    <string name="capture_service_start_failed">無法啟動螢幕擷取，請回首頁重新授權</string>
+    <string name="capture_failed_using_demo">截圖失敗，改用備援建議</string>
+    <string name="overlay_unavailable">無法顯示分析面板，請確認上層顯示權限</string>
+    <string name="reply_filled">已填入輸入框，確認後由你手動送出</string>
+    <string name="reply_pasted">已貼入輸入框，確認後由你手動送出</string>
+    <string name="reply_copied">已複製回覆</string>
+    <string name="reply_copied_fallback">無法直接填入，已複製供你手動貼上</string>
+    <string name="reply_copy_failed">無法填入或複製，請再試一次</string>
 </resources>
