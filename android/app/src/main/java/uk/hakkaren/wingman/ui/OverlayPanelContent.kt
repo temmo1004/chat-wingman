@@ -29,7 +29,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
@@ -245,10 +244,7 @@ private fun ResultPanel(
                 animationSpec = tween(REPLY_SWITCH_DURATION_MS),
                 label = "selectedReply",
             ) { reply ->
-                SelectedReplyContent(
-                    reply = reply,
-                    onFill = onFill,
-                )
+                SelectedReplyContent(reply = reply)
             }
 
             Row(
@@ -256,19 +252,19 @@ private fun ResultPanel(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Button(
-                    onClick = { onFill(selectedReply) },
+                    onClick = { onCopy(selectedReply) },
                     modifier = Modifier
                         .weight(1.55f)
                         .heightIn(min = 52.dp),
                     shape = RoundedCornerShape(15.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = WingmanColors.Orange),
                 ) {
-                    Icon(Icons.Outlined.Edit, contentDescription = null)
+                    Icon(Icons.Outlined.ContentCopy, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
-                    Text("填入輸入框", fontWeight = FontWeight.Bold)
+                    Text("複製回覆", fontWeight = FontWeight.Bold)
                 }
                 OutlinedButton(
-                    onClick = { onCopy(selectedReply) },
+                    onClick = { onFill(selectedReply) },
                     modifier = Modifier
                         .weight(1f)
                         .heightIn(min = 52.dp),
@@ -276,9 +272,9 @@ private fun ResultPanel(
                     border = BorderStroke(1.dp, WingmanColors.Border),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = WingmanColors.Ink),
                 ) {
-                    Icon(Icons.Outlined.ContentCopy, contentDescription = null)
+                    Icon(Icons.Outlined.Edit, contentDescription = null)
                     Spacer(Modifier.width(6.dp))
-                    Text("複製", fontWeight = FontWeight.Bold)
+                    Text("填入", fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -339,7 +335,6 @@ private fun AnalysisMetaRow() {
 @Composable
 private fun SelectedReplyContent(
     reply: Reply,
-    onFill: (Reply) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Surface(
@@ -348,34 +343,13 @@ private fun SelectedReplyContent(
             shape = RoundedCornerShape(18.dp),
             border = BorderStroke(1.5.dp, WingmanColors.Orange),
         ) {
-            Row(
-                modifier = Modifier.padding(start = 16.dp, top = 15.dp, end = 12.dp, bottom = 15.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Text(
-                    text = reply.text,
-                    color = WingmanColors.Ink,
-                    fontSize = 17.sp,
-                    lineHeight = 25.sp,
-                    modifier = Modifier.weight(1f),
-                )
-                Surface(
-                    shape = CircleShape,
-                    color = WingmanColors.Orange,
-                ) {
-                    IconButton(
-                        onClick = { onFill(reply) },
-                        modifier = Modifier.size(48.dp),
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.Send,
-                            contentDescription = "填入這句回覆",
-                            tint = Color.White,
-                        )
-                    }
-                }
-            }
+            Text(
+                text = reply.text,
+                color = WingmanColors.Ink,
+                fontSize = 17.sp,
+                lineHeight = 25.sp,
+                modifier = Modifier.padding(16.dp),
+            )
         }
 
         Surface(

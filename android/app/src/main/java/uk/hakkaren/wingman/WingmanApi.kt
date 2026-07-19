@@ -1,7 +1,6 @@
 package uk.hakkaren.wingman
 
 import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -11,7 +10,7 @@ import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 /**
- * POST /api/wingman。客戶端只送 multipart 截圖與 locale，API Key 永遠留在後端。
+ * POST /api/wingman。客戶端只送手機端 OCR 後的對話文字，圖片與 API Key 都不離開各自端點。
  * 呼叫端須在 IO dispatcher 執行；所有 HTTP/解析例外由服務的降級鏈接住。
  */
 object WingmanApi {
@@ -23,30 +22,26 @@ object WingmanApi {
         .callTimeout(35, TimeUnit.SECONDS)
         .build()
 
-    /** @param png 截圖 PNG bytes；demo=true 時請後端回固定合約範本。 */
-    fun analyze(png: ByteArray?, demo: Boolean = false): WingmanResult {
-        val form = MultipartBody.Builder()
-            .setType(MultipartBody.FORM)
-            .addFormDataPart("locale", "zh-TW")
-        if (demo) {
-            form.addFormDataPart("demo", "true")
-        } else {
-            val image = requireNotNull(png) { "png required when demo=false" }
-            form.addFormDataPart(
-                "image",
-                "screen.png",
-                image.toRequestBody("image/png".toMediaType()),
-            )
+    /** @param text OCR 對話文字；demo=true 時請後端回固定合約範本。 */
+    fun analyze(text: String?, demo: Boolean = false): WingmanResult {
+        val body = JSONObject().put("demo", demo)
+        if (!demo) {
+            val conversation = text?.trim().orEmpty()
+            require(conversation.isNotEmpty()) { "text required when demo=false" }
+            body.put("text", conversation)
         }
 
         val request = Request.Builder()
             .url("${BuildConfig.BACKEND_URL.trimEnd('/')}/api/wingman")
-            .post(form.build())
+            .post(
+                body.toString().toRequestBody("application/json; charset=utf-8".toMediaType()),
+            )
             .build()
 
         client.newCall(request).execute().use { response ->
             val raw = response.body?.string().orEmpty()
-            if (!response.isSuccessful) throw IOException("HTTP ${response.code}: $raw")
+            // 避免伺服器錯誤頁意外回顯對話內容後，被上層 Log.w 寫入裝置 log。
+            if (!response.isSuccessful) throw IOException("HTTP ${response.code}")
             return parse(raw)
         }
     }

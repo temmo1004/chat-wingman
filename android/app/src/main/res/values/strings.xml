@@ -10,6 +10,8 @@
     <string name="capture_service_start_failed">無法啟動螢幕擷取，請回首頁重新授權</string>
     <string name="overlay_permission_missing">上層顯示權限已關閉，請回首頁重新開啟</string>
     <string name="capture_failed_using_demo">截圖失敗，改用備援建議</string>
+    <string name="image_decode_failed_using_demo">無法讀取圖片，改用備援建議</string>
+    <string name="ocr_failed_using_demo">沒有辨識到對話文字，改用備援建議</string>
     <string name="overlay_unavailable">無法顯示分析面板，請確認上層顯示權限</string>
     <string name="reply_filled">已填入輸入框，確認後由你手動送出</string>
     <string name="reply_pasted">已貼入輸入框，確認後由你手動送出</string>

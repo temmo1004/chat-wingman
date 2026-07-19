@@ -10,6 +10,8 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
 import android.media.projection.MediaProjection
@@ -34,12 +36,12 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.ByteArrayOutputStream
 import kotlin.math.abs
 import kotlin.math.hypot
 
 /**
- * 常駐前景服務：畫出可拖曳的孔明帽浮動球。點擊後截圖、分析並顯示 Compose 面板。
+ * 常駐前景服務：畫出可拖曳的孔明帽浮動球。點擊後截圖、在手機端 OCR，
+ * 再把文字交給後端分析並顯示 Compose 面板。
  * MediaProjection 授權只由 MainActivity 傳入；服務本身不保存或要求任何 API Key。
  */
 class FloatingBubbleService : Service() {
@@ -85,6 +87,9 @@ class FloatingBubbleService : Service() {
             // 必須先進入 mediaProjection 型前景服務，再取得 MediaProjection。
             // 每次收到新授權都替換舊 manager，讓使用者停止分享後可以重新授權。
             if (resultCode == Activity.RESULT_OK && data != null) {
+                // 新授權代表上一輪已失效；一併關掉可能仍停在 Loading 的舊面板。
+                panel?.dismiss()
+                panel = null
                 val manager = getSystemService(
                     Context.MEDIA_PROJECTION_SERVICE,
                 ) as MediaProjectionManager
@@ -256,11 +261,19 @@ class FloatingBubbleService : Service() {
         panel = null
         isAnalyzing = true
         val token = ++analysisToken
+
+        // 預設展示版完全不截圖、不做網路呼叫，仍保留 Loading → 結果的完整體驗。
+        if (BuildConfig.DEMO_ONLY) {
+            showPanelLoading()
+            analyzeText(null, token)
+            return
+        }
+
         val captureManager = capture
 
         if (captureManager == null) {
             showPanelLoading()
-            analyze(null, token)
+            analyzeText(null, token)
             return
         }
 
@@ -280,32 +293,16 @@ class FloatingBubbleService : Service() {
                         R.string.capture_failed_using_demo,
                         Toast.LENGTH_SHORT,
                     ).show()
-                    analyze(null, token)
+                    analyzeText(null, token)
                 } else {
-                    scope.launch {
-                        val png = withContext(Dispatchers.Default) {
-                            try {
-                                ByteArrayOutputStream().use { output ->
-                                    bitmap.compress(
-                                        android.graphics.Bitmap.CompressFormat.PNG,
-                                        100,
-                                        output,
-                                    )
-                                    output.toByteArray()
-                                }
-                            } finally {
-                                bitmap.recycle()
-                            }
-                        }
-                        analyze(png, token)
-                    }
+                    ocrAndAnalyze(bitmap, token)
                 }
             }
         } catch (error: RuntimeException) {
             Log.e(TAG, "Screenshot request failed", error)
             bubble?.visibility = View.VISIBLE
             showPanelLoading()
-            analyze(null, token)
+            analyzeText(null, token)
         }
     }
 
@@ -323,14 +320,53 @@ class FloatingBubbleService : Service() {
         isAnalyzing = true
         val token = ++analysisToken
         showPanelLoading()
-        analyze(png, token)
+
+        if (BuildConfig.DEMO_ONLY) {
+            analyzeText(null, token)
+            return
+        }
+
+        scope.launch {
+            val bitmap = withContext(Dispatchers.Default) {
+                BitmapFactory.decodeByteArray(png, 0, png.size)
+            }
+            if (token != analysisToken) {
+                bitmap?.recycle()
+                return@launch
+            }
+            if (bitmap == null) {
+                Toast.makeText(
+                    this@FloatingBubbleService,
+                    R.string.image_decode_failed_using_demo,
+                    Toast.LENGTH_SHORT,
+                ).show()
+                analyzeText(null, token)
+            } else {
+                ocrAndAnalyze(bitmap, token)
+            }
+        }
     }
 
     // ── 後端 + 面板 ──────────────────────────────────────
-    private fun analyze(png: ByteArray?, token: Long) {
+    private fun ocrAndAnalyze(bitmap: Bitmap, token: Long) {
+        OcrHelper.extract(bitmap) { text ->
+            if (token != analysisToken) return@extract
+            val conversation = text.trim().takeIf(String::isNotEmpty)
+            if (conversation == null) {
+                Toast.makeText(
+                    this,
+                    R.string.ocr_failed_using_demo,
+                    Toast.LENGTH_SHORT,
+                ).show()
+            }
+            analyzeText(conversation, token)
+        }
+    }
+
+    private fun analyzeText(text: String?, token: Long) {
         scope.launch {
             if (token != analysisToken) return@launch
-            val result = withContext(Dispatchers.IO) { resolveResult(png) }
+            val result = withContext(Dispatchers.IO) { resolveResult(text) }
             if (token != analysisToken) return@launch
             showPanel(result)
             isAnalyzing = false
@@ -338,11 +374,12 @@ class FloatingBubbleService : Service() {
     }
 
     /** 真實 API → 後端 demo → LocalDemo；任一錯誤只降級，不往主執行緒拋。 */
-    private fun resolveResult(png: ByteArray?): WingmanResult {
+    private fun resolveResult(text: String?): WingmanResult {
         if (BuildConfig.DEMO_ONLY) return LocalDemo.result
 
-        if (png != null) {
-            runCatching { WingmanApi.analyze(png, demo = false) }
+        val conversation = text?.trim().orEmpty()
+        if (conversation.isNotEmpty()) {
+            runCatching { WingmanApi.analyze(conversation, demo = false) }
                 .onFailure { Log.w(TAG, "Live analysis failed; trying backend demo", it) }
                 .getOrNull()
                 ?.let { return it }

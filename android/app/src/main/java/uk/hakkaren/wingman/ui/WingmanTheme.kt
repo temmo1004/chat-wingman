@@ -13,7 +13,7 @@ object WingmanColors {
     val CreamStrong = Color(0xFFFFE5CF)
     val Orange = Color(0xFFC84222)
     val OrangeAccent = Color(0xFFEB572D)
-    val OrangeDark = Color(0xFFC84222)
+    val OrangeDark = Color(0xFFBE3C1E)
     val Caramel = Color(0xFFC9824B)
     val Border = Color(0xFFEADFD5)
     val SoftSurface = Color(0xFFF8F4EF)

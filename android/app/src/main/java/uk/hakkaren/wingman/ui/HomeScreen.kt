@@ -22,13 +22,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowForwardIos
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.outlined.ArrowForwardIos
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.School
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Shield
@@ -221,7 +221,7 @@ private fun HeroCard(
             ) {
                 Text("查看使用方法", fontSize = 15.sp, fontWeight = FontWeight.Bold)
                 Icon(
-                    imageVector = Icons.Outlined.KeyboardArrowRight,
+                    imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
                     contentDescription = null,
                     modifier = Modifier.size(22.dp),
                 )
@@ -291,7 +291,7 @@ private fun PermissionCard(
                             modifier = Modifier.weight(1f),
                         )
                         Icon(
-                            imageVector = Icons.Outlined.ArrowForwardIos,
+                            imageVector = Icons.AutoMirrored.Outlined.ArrowForwardIos,
                             contentDescription = null,
                             tint = WingmanColors.OrangeDark,
                             modifier = Modifier.size(14.dp),
@@ -346,7 +346,7 @@ private fun PermissionRow(
             fontWeight = FontWeight.Medium,
         )
         Icon(
-            imageVector = Icons.Outlined.KeyboardArrowRight,
+            imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
             contentDescription = null,
             tint = WingmanColors.Muted,
             modifier = Modifier.size(22.dp),
@@ -460,13 +460,13 @@ private fun InstructionsDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = { WingmanLogo(modifier = Modifier.size(56.dp)) },
-        title = { Text("三步叫出軍師", fontWeight = FontWeight.Black) },
+        title = { Text("四步叫出軍師", fontWeight = FontWeight.Black) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("1. 開啟顯示在其他 App 上層")
                 Text("2. 授權螢幕擷取後，到聊天畫面短按孔明帽分析目前畫面")
                 Text("3. 長按孔明帽可從相簿選擇聊天截圖")
-                Text("4. 選語氣，填入輸入框或複製；訊息仍由你親自送出")
+                Text("4. 選語氣後複製回覆；已開啟無障礙時也可一鍵填入")
                 Text(
                     text = "軍師只分析你當次主動擷取的畫面，不會在背景監看聊天。",
                     color = WingmanColors.Muted,

@@ -24,7 +24,7 @@ android {
 
         // 後端位址；部署好把這裡換成公開 URL（見 backend/、docs/api.md）
         buildConfigField("String", "BACKEND_URL", "\"${wingmanBackendUrl.get()}\"")
-        // 公開端點尚未符合 docs/api.md 時預設不傳送截圖；部署完成後以
+        // 公開端點尚未符合 docs/api.md 時預設不擷取畫面、不傳送 OCR 文字；部署完成後以
         // -PWINGMAN_DEMO_ONLY=false -PWINGMAN_BACKEND_URL=https://... 啟用。
         buildConfigField("boolean", "DEMO_ONLY", wingmanDemoOnly.get())
     }
@@ -78,6 +78,8 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    // 手機端 OCR（中文，bundled 模型，免 Google Play Services）
+    implementation("com.google.mlkit:text-recognition-chinese:16.0.1")
 
     debugImplementation(composeBom)
     debugImplementation("androidx.compose.ui:ui-tooling")
