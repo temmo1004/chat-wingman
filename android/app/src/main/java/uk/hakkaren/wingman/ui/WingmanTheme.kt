@@ -11,12 +11,13 @@ object WingmanColors {
     val WarmWhite = Color(0xFFFFFCF8)
     val Cream = Color(0xFFFFF2E4)
     val CreamStrong = Color(0xFFFFE5CF)
-    val Orange = Color(0xFFEB572D)
-    val OrangeDark = Color(0xFFC84222)
+    val Orange = Color(0xFFC84222)
+    val OrangeAccent = Color(0xFFEB572D)
+    val OrangeDark = Color(0xFFBE3C1E)
     val Caramel = Color(0xFFC9824B)
     val Border = Color(0xFFEADFD5)
     val SoftSurface = Color(0xFFF8F4EF)
-    val Success = Color(0xFF159455)
+    val Success = Color(0xFF0F7D45)
     val SuccessSoft = Color(0xFFE8F7EE)
 }
 
@@ -26,6 +27,9 @@ private val WingmanLightColors = lightColorScheme(
     primaryContainer = WingmanColors.CreamStrong,
     onPrimaryContainer = WingmanColors.OrangeDark,
     secondary = WingmanColors.Caramel,
+    onSecondary = Color.White,
+    secondaryContainer = WingmanColors.CreamStrong,
+    onSecondaryContainer = WingmanColors.OrangeDark,
     background = WingmanColors.WarmWhite,
     onBackground = WingmanColors.Ink,
     surface = Color.White,

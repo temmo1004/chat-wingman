@@ -4,17 +4,16 @@ import android.accessibilityservice.AccessibilityService
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import android.graphics.Rect
 import android.os.Bundle
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import java.util.ArrayDeque
 
 /**
- * 定位聊天輸入框並填字。策略：語意查找（可編輯 EditText）而非寫死座標/viewId
- * （研究報告 III：viewId 會隨版本改，語意查找較穩）。
- *
- * 填字優先 ACTION_SET_TEXT；失敗（如 Compose 自繪輸入框會靜默拒絕）退 ACTION_PASTE。
- * 送出交給使用者手按——不自動送，避開 Google Play 自動操作紅線。
+ * 定位目前聊天輸入框並填字。策略是語意查找可編輯節點，不依賴座標或易變的 viewId。
+ * 只執行 SET_TEXT / PASTE，絕不尋找或點擊送出按鈕。
  */
 class WingmanAccessibilityService : AccessibilityService() {
 
@@ -27,49 +26,92 @@ class WingmanAccessibilityService : AccessibilityService() {
         super.onDestroy()
     }
 
-    override fun onAccessibilityEvent(event: AccessibilityEvent?) { /* 被動查找，不需常駐監聽 */ }
-    override fun onInterrupt() {}
-
-    /** 把回覆填進當前聊天輸入框。回傳是否成功。 */
-    fun fillReply(text: String): Boolean {
-        val root = rootInActiveWindow ?: return false
-        val field = pickInputField(root) ?: return false
-
-        // 1) 優先 ACTION_SET_TEXT
-        val args = Bundle().apply {
-            putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text)
-        }
-        if (field.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)) return true
-
-        // 2) 退回剪貼簿 + ACTION_PASTE（相容性較高；target 12+ 剪貼簿讀取受限，安全）
-        val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        cm.setPrimaryClip(ClipData.newPlainText("wingman", text))
-        field.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
-        return field.performAction(AccessibilityNodeInfo.ACTION_PASTE)
+    override fun onUnbind(intent: Intent?): Boolean {
+        if (instance === this) instance = null
+        return super.onUnbind(intent)
     }
+
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        // 被動服務：只有使用者按面板「填入」時才查詢目前視窗。
+    }
+
+    override fun onInterrupt() = Unit
+
+    /** ACTION_SET_TEXT → Clipboard + ACTION_PASTE → Clipboard-only。 */
+    fun fillReply(text: String): FillOutcome {
+        val field = rootInActiveWindow?.let(::findEditable)
+
+        if (field != null) {
+            val args = Bundle().apply {
+                putCharSequence(
+                    AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
+                    text,
+                )
+            }
+            val set = runCatching {
+                field.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
+            }.getOrDefault(false)
+            if (set) return FillOutcome.SET_TEXT
+        }
+
+        // SET_TEXT 失敗或找不到輸入框時，仍先完成剪貼簿備援。
+        if (!copyToClipboard(text)) return FillOutcome.FAILED
+        if (field == null) return FillOutcome.COPIED
+
+        runCatching { field.performAction(AccessibilityNodeInfo.ACTION_FOCUS) }
+        val pasted = runCatching {
+            field.performAction(AccessibilityNodeInfo.ACTION_PASTE)
+        }.getOrDefault(false)
+        return if (pasted) FillOutcome.PASTED else FillOutcome.COPIED
+    }
+
+    private fun copyToClipboard(text: String): Boolean = runCatching {
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(
+            ClipData.newPlainText(getString(R.string.clipboard_label), text),
+        )
+    }.isSuccess
 
     /**
-     * 挑真正的聊天輸入框。實測（IG DM）：一個畫面可能有多個 EditText 節點，
-     * 含 2x2 像素的隱藏 decoy，直接取第一個會填錯。策略：
-     * 1) 優先取「已聚焦的輸入節點」（使用者點過輸入框時最準）
-     * 2) 否則收集所有可編輯節點，取「可見且面積最大」者（通常就是訊息輸入框）
+     * 優先目前聚焦的輸入框；否則取可見且面積最大的可編輯節點，
+     * 避免部分聊天 App 內的微型隱藏 EditText decoy 被誤選。
      */
-    private fun pickInputField(root: AccessibilityNodeInfo): AccessibilityNodeInfo? {
-        root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)?.let {
-            if (it.isEditable && it.isEnabled) return it
-        }
+    private fun findEditable(root: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        val pending = ArrayDeque<AccessibilityNodeInfo>()
+        pending.add(root)
         val candidates = ArrayList<AccessibilityNodeInfo>()
-        collectEditable(root, candidates)
-        val visible = candidates.filter { it.isVisibleToUser && it.isEnabled }
-        return (visible.ifEmpty { candidates }).maxByOrNull { node ->
-            val r = Rect(); node.getBoundsInScreen(r); r.width().toLong() * r.height()
+
+        while (pending.isNotEmpty()) {
+            val node = pending.removeFirst()
+            val supportsSetText = node.actionList.any {
+                it.id == AccessibilityNodeInfo.ACTION_SET_TEXT
+            }
+            val editTextClass = node.className
+                ?.toString()
+                ?.contains("EditText", ignoreCase = true) == true
+            val candidate = node.isEditable && node.isEnabled && node.isVisibleToUser &&
+                (supportsSetText || editTextClass)
+            if (candidate) {
+                if (node.isFocused || node.isAccessibilityFocused) return node
+                candidates.add(node)
+            }
+
+            for (index in 0 until node.childCount) {
+                node.getChild(index)?.let(pending::addLast)
+            }
+        }
+        return candidates.maxByOrNull { node ->
+            val bounds = Rect()
+            node.getBoundsInScreen(bounds)
+            bounds.width().toLong() * bounds.height().toLong()
         }
     }
 
-    private fun collectEditable(node: AccessibilityNodeInfo?, out: MutableList<AccessibilityNodeInfo>) {
-        if (node == null) return
-        if (node.isEditable) out.add(node)
-        for (i in 0 until node.childCount) collectEditable(node.getChild(i), out)
+    enum class FillOutcome {
+        SET_TEXT,
+        PASTED,
+        COPIED,
+        FAILED,
     }
 
     companion object {
@@ -77,7 +119,7 @@ class WingmanAccessibilityService : AccessibilityService() {
         var instance: WingmanAccessibilityService? = null
             private set
 
-        /** 給浮動球面板呼叫：無障礙服務沒開時回 false，呼叫端退回「複製到剪貼簿」。 */
-        fun fill(text: String): Boolean = instance?.fillReply(text) ?: false
+        /** 未啟用服務時回 FAILED，由呼叫端完成 Clipboard-only 備援。 */
+        fun fill(text: String): FillOutcome = instance?.fillReply(text) ?: FillOutcome.FAILED
     }
 }

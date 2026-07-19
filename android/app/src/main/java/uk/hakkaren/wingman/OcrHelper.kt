@@ -18,10 +18,29 @@ object OcrHelper {
     /** 辨識後在主執行緒回呼組好的對話文字（每行前綴 對方: / 我:）。 */
     fun extract(bitmap: Bitmap, onResult: (String) -> Unit) {
         val width = bitmap.width
-        recognizer.process(InputImage.fromBitmap(bitmap, 0))
+        val task = try {
+            recognizer.process(InputImage.fromBitmap(bitmap, 0))
+        } catch (error: RuntimeException) {
+            Log.w(TAG, "Unable to start OCR", error)
+            if (!bitmap.isRecycled) bitmap.recycle()
+            onResult("")
+            return
+        }
+        task
             .addOnSuccessListener { visionText ->
                 val sb = StringBuilder()
-                for (block in visionText.textBlocks) {
+                val blocks = visionText.textBlocks.sortedWith(
+                    compareBy(
+                        { it.boundingBox?.top ?: Int.MAX_VALUE },
+                        { it.boundingBox?.left ?: Int.MAX_VALUE },
+                    ),
+                )
+                for (block in blocks) {
+                    val content = block.text
+                        .lineSequence()
+                        .joinToString(" ") { it.trim() }
+                        .trim()
+                    if (content.isEmpty()) continue
                     val box = block.boundingBox
                     val prefix = when {
                         box == null -> ""
@@ -29,12 +48,21 @@ object OcrHelper {
                         box.centerX() < width * 0.45 -> "對方: "
                         else -> ""
                     }
-                    sb.append(prefix).append(block.text.replace("\n", " ")).append("\n")
+                    sb.append(prefix).append(content).append("\n")
                 }
                 val out = sb.toString().trim()
-                Log.d("Wingman-OCR", "辨識結果:\n$out")
+                // 不把聊天內容寫入 log；只保留排查流程所需的長度資訊。
+                Log.d(TAG, "OCR completed: ${out.length} chars")
                 onResult(out)
             }
-            .addOnFailureListener { onResult("") }
+            .addOnFailureListener {
+                Log.w(TAG, "OCR failed", it)
+                onResult("")
+            }
+            .addOnCompleteListener {
+                if (!bitmap.isRecycled) bitmap.recycle()
+            }
     }
+
+    private const val TAG = "Wingman-OCR"
 }

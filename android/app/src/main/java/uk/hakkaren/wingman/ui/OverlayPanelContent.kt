@@ -29,7 +29,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
@@ -62,8 +61,12 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.paneTitle
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -112,6 +115,9 @@ fun WingmanOverlayPanel(
         ) {
             AnimatedContent(
                 targetState = state,
+                modifier = Modifier.semantics {
+                    liveRegion = LiveRegionMode.Polite
+                },
                 transitionSpec = {
                     fadeIn(tween(STATE_ENTER_DURATION_MS)) togetherWith
                         fadeOut(tween(STATE_EXIT_DURATION_MS))
@@ -238,10 +244,7 @@ private fun ResultPanel(
                 animationSpec = tween(REPLY_SWITCH_DURATION_MS),
                 label = "selectedReply",
             ) { reply ->
-                SelectedReplyContent(
-                    reply = reply,
-                    onFill = onFill,
-                )
+                SelectedReplyContent(reply = reply)
             }
 
             Row(
@@ -332,7 +335,6 @@ private fun AnalysisMetaRow() {
 @Composable
 private fun SelectedReplyContent(
     reply: Reply,
-    onFill: (Reply) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Surface(
@@ -341,34 +343,13 @@ private fun SelectedReplyContent(
             shape = RoundedCornerShape(18.dp),
             border = BorderStroke(1.5.dp, WingmanColors.Orange),
         ) {
-            Row(
-                modifier = Modifier.padding(start = 16.dp, top = 15.dp, end = 12.dp, bottom = 15.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Text(
-                    text = reply.text,
-                    color = WingmanColors.Ink,
-                    fontSize = 17.sp,
-                    lineHeight = 25.sp,
-                    modifier = Modifier.weight(1f),
-                )
-                Surface(
-                    shape = CircleShape,
-                    color = WingmanColors.Orange,
-                ) {
-                    IconButton(
-                        onClick = { onFill(reply) },
-                        modifier = Modifier.size(48.dp),
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.Send,
-                            contentDescription = "填入這句回覆",
-                            tint = Color.White,
-                        )
-                    }
-                }
-            }
+            Text(
+                text = reply.text,
+                color = WingmanColors.Ink,
+                fontSize = 17.sp,
+                lineHeight = 25.sp,
+                modifier = Modifier.padding(16.dp),
+            )
         }
 
         Surface(
@@ -453,7 +434,12 @@ private fun StyleButton(
         Button(
             onClick = onClick,
             enabled = enabled,
-            modifier = modifier.heightIn(min = 50.dp),
+            modifier = modifier
+                .heightIn(min = 50.dp)
+                .semantics {
+                    this.selected = selected
+                    stateDescription = if (selected) "已選取" else "未選取"
+                },
             shape = RoundedCornerShape(14.dp),
             contentPadding = PaddingValues(horizontal = 6.dp),
             colors = ButtonDefaults.buttonColors(
@@ -468,7 +454,12 @@ private fun StyleButton(
         OutlinedButton(
             onClick = onClick,
             enabled = enabled,
-            modifier = modifier.heightIn(min = 50.dp),
+            modifier = modifier
+                .heightIn(min = 50.dp)
+                .semantics {
+                    this.selected = selected
+                    stateDescription = if (selected) "已選取" else "未選取"
+                },
             shape = RoundedCornerShape(14.dp),
             contentPadding = PaddingValues(horizontal = 6.dp),
             colors = ButtonDefaults.outlinedButtonColors(

@@ -4,19 +4,19 @@ import android.graphics.Bitmap
 import android.graphics.PixelFormat
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
+import android.media.Image
 import android.media.ImageReader
 import android.media.projection.MediaProjection
 import android.os.Handler
 import android.os.Looper
 import android.util.DisplayMetrics
+import android.util.Log
 
 /**
- * 用 MediaProjection 抓一張當前螢幕。單次擷取 → 回 Bitmap。
+ * 用 MediaProjection 擷取單張畫面。
  *
- * 注意（Android 14）：
- * - 必須先啟動 foregroundServiceType=mediaProjection 的前景服務，才能 getMediaProjection()
- * - 每次取得投影都要重新經使用者同意（見 MainActivity 流程）
- * - 用完記得 release()
+ * Android 14 的同一份使用者授權只允許呼叫 createVirtualDisplay 一次，因此這個類別
+ * 會保留 VirtualDisplay，單次擷取後只卸下 Surface；refresh 時再掛回相同 Surface。
  */
 class ScreenCaptureManager(
     private val projection: MediaProjection,
@@ -25,54 +25,160 @@ class ScreenCaptureManager(
     private val handler = Handler(Looper.getMainLooper())
     private var imageReader: ImageReader? = null
     private var virtualDisplay: VirtualDisplay? = null
+    private var pendingResult: ((Bitmap?) -> Unit)? = null
+    private var timeout: Runnable? = null
+    private var projectionStopped = false
+    private var released = false
 
-    init {
-        // Android 14+ 要求註冊 callback，否則 getMediaProjection 之後會擲例外
-        projection.registerCallback(object : MediaProjection.Callback() {}, handler)
+    private val projectionCallback = object : MediaProjection.Callback() {
+        override fun onStop() {
+            projectionStopped = true
+            completeCapture(null)
+            releaseDisplay()
+        }
     }
 
-    /** 擷取一張畫面。onResult 在主執行緒回呼。 */
+    init {
+        // targetSdk 34 必須在建立 VirtualDisplay 前註冊 callback。
+        projection.registerCallback(projectionCallback, handler)
+    }
+
+    /** 擷取一張畫面；onResult 保證在主執行緒回呼，失敗或逾時回 null。 */
     fun captureOnce(onResult: (Bitmap?) -> Unit) {
-        val w = metrics.widthPixels
-        val h = metrics.heightPixels
-        val reader = ImageReader.newInstance(w, h, PixelFormat.RGBA_8888, 2)
-        imageReader = reader
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            handler.post { captureOnce(onResult) }
+            return
+        }
+        if (released || projectionStopped || pendingResult != null) {
+            onResult(null)
+            return
+        }
 
-        virtualDisplay = projection.createVirtualDisplay(
-            "wingman-capture",
-            w, h, metrics.densityDpi,
-            DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-            reader.surface, null, handler,
-        )
+        pendingResult = onResult
+        timeout = Runnable {
+            Log.w(TAG, "Timed out waiting for a MediaProjection frame")
+            completeCapture(null)
+        }.also { handler.postDelayed(it, CAPTURE_TIMEOUT_MS) }
 
-        reader.setOnImageAvailableListener({ r ->
-            val image = r.acquireLatestImage() ?: return@setOnImageAvailableListener
+        try {
+            ensureDisplay()
+        } catch (error: RuntimeException) {
+            Log.e(TAG, "Unable to create or resume VirtualDisplay", error)
+            completeCapture(null)
+        }
+    }
+
+    private fun ensureDisplay() {
+        check(!released && !projectionStopped) { "MediaProjection is no longer available" }
+
+        val width = metrics.widthPixels
+        val height = metrics.heightPixels
+        val reader = imageReader ?: ImageReader.newInstance(
+            width,
+            height,
+            PixelFormat.RGBA_8888,
+            MAX_IMAGES,
+        ).also { imageReader = it }
+
+        reader.setOnImageAvailableListener({ source ->
+            val image = try {
+                source.acquireLatestImage()
+            } catch (error: RuntimeException) {
+                Log.w(TAG, "ImageReader closed before frame delivery", error)
+                completeCapture(null)
+                return@setOnImageAvailableListener
+            } ?: return@setOnImageAvailableListener
             val bitmap = try {
-                val plane = image.planes[0]
-                val rowPadding = plane.rowStride - plane.pixelStride * w
-                val bmp = Bitmap.createBitmap(
-                    w + rowPadding / plane.pixelStride, h, Bitmap.Config.ARGB_8888,
-                )
-                bmp.copyPixelsFromBuffer(plane.buffer)
-                Bitmap.createBitmap(bmp, 0, 0, w, h) // 裁掉 row padding
-            } catch (e: Exception) {
-                null
+                imageToBitmap(image, width, height)
             } finally {
                 image.close()
             }
-            // 一次性：抓到就收工，避免連續回呼
-            r.setOnImageAvailableListener(null, null)
-            handler.post { onResult(bitmap); teardown() }
+            completeCapture(bitmap)
         }, handler)
+
+        val display = virtualDisplay
+        if (display == null) {
+            virtualDisplay = projection.createVirtualDisplay(
+                "wingman-capture",
+                width,
+                height,
+                metrics.densityDpi,
+                DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+                reader.surface,
+                null,
+                handler,
+            )
+        } else {
+            display.setSurface(reader.surface)
+        }
     }
 
-    private fun teardown() {
-        virtualDisplay?.release(); virtualDisplay = null
-        imageReader?.close(); imageReader = null
+    private fun imageToBitmap(image: Image, width: Int, height: Int): Bitmap? {
+        return try {
+            val plane = image.planes.firstOrNull() ?: return null
+            val pixelStride = plane.pixelStride
+            if (pixelStride <= 0) return null
+            val rowPadding = plane.rowStride - pixelStride * width
+            val paddedWidth = width + rowPadding.coerceAtLeast(0) / pixelStride
+            val padded = Bitmap.createBitmap(paddedWidth, height, Bitmap.Config.ARGB_8888)
+            plane.buffer.rewind()
+            padded.copyPixelsFromBuffer(plane.buffer)
+            if (paddedWidth == width) {
+                padded
+            } else {
+                Bitmap.createBitmap(padded, 0, 0, width, height).also { padded.recycle() }
+            }
+        } catch (error: RuntimeException) {
+            Log.e(TAG, "Unable to copy MediaProjection image", error)
+            null
+        }
+    }
+
+    private fun completeCapture(bitmap: Bitmap?) {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            handler.post { completeCapture(bitmap) }
+            return
+        }
+        val callback = pendingResult ?: run {
+            bitmap?.recycle()
+            return
+        }
+        pendingResult = null
+        timeout?.let(handler::removeCallbacks)
+        timeout = null
+        pauseDisplay()
+        callback(bitmap)
+    }
+
+    /** 停止產生 frame，但不 release VirtualDisplay，讓同一份 Android 14 grant 可 refresh。 */
+    private fun pauseDisplay() {
+        imageReader?.setOnImageAvailableListener(null, null)
+        runCatching { virtualDisplay?.setSurface(null) }
+        runCatching { imageReader?.acquireLatestImage()?.close() }
+    }
+
+    private fun releaseDisplay() {
+        imageReader?.setOnImageAvailableListener(null, null)
+        runCatching { virtualDisplay?.release() }
+        virtualDisplay = null
+        runCatching { imageReader?.close() }
+        imageReader = null
     }
 
     fun release() {
-        teardown()
-        projection.stop()
+        if (released) return
+        released = true
+        timeout?.let(handler::removeCallbacks)
+        timeout = null
+        pendingResult = null
+        releaseDisplay()
+        runCatching { projection.unregisterCallback(projectionCallback) }
+        runCatching { projection.stop() }
+    }
+
+    private companion object {
+        const val TAG = "ScreenCaptureManager"
+        const val MAX_IMAGES = 2
+        const val CAPTURE_TIMEOUT_MS = 3_000L
     }
 }
