@@ -3,6 +3,14 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+val wingmanBackendUrl = providers.gradleProperty("WINGMAN_BACKEND_URL")
+    .orElse("https://api.hakkaren.uk")
+val wingmanDemoOnly = providers.gradleProperty("WINGMAN_DEMO_ONLY")
+    .orElse("true")
+val wingmanQaBuild = providers.gradleProperty("WINGMAN_QA_BUILD")
+    .orElse("false")
+    .map { it.equals("true", ignoreCase = true) }
+
 android {
     namespace = "uk.hakkaren.wingman"
     compileSdk = 34
@@ -15,15 +23,27 @@ android {
         versionName = "0.1"
 
         // 後端位址；部署好把這裡換成公開 URL（見 backend/、docs/api.md）
-        buildConfigField("String", "BACKEND_URL", "\"https://api.hakkaren.uk\"")
-        // true = 完全走本地寫死範本、不碰網路（後端還沒部署時 demo 用）
-        buildConfigField("boolean", "DEMO_ONLY", "false")
+        buildConfigField("String", "BACKEND_URL", "\"${wingmanBackendUrl.get()}\"")
+        // 公開端點尚未符合 docs/api.md 時預設不傳送截圖；部署完成後以
+        // -PWINGMAN_DEMO_ONLY=false -PWINGMAN_BACKEND_URL=https://... 啟用。
+        buildConfigField("boolean", "DEMO_ONLY", wingmanDemoOnly.get())
     }
 
     buildFeatures {
         buildConfig = true
         compose = true
         viewBinding = true
+    }
+
+    buildTypes {
+        getByName("debug") {
+            // 多個平行 Codex 工作區共用同一台模擬器時，可用獨立套件完成 QA，
+            // 避免其他分支覆蓋正在驗收的 APK；一般 debug/release 套件名稱不變。
+            if (wingmanQaBuild.get()) {
+                applicationIdSuffix = ".integrationqa"
+                versionNameSuffix = "-integration-qa"
+            }
+        }
     }
 
     composeOptions {
@@ -45,6 +65,7 @@ dependencies {
     implementation("androidx.activity:activity-ktx:1.9.0")
     implementation("androidx.activity:activity-compose:1.9.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.3")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.3")
     implementation("androidx.lifecycle:lifecycle-viewmodel:2.8.3")
     implementation("androidx.savedstate:savedstate-ktx:1.2.1")
     implementation("com.google.android.material:material:1.12.0")

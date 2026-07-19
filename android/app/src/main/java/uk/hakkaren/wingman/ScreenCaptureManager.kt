@@ -81,7 +81,13 @@ class ScreenCaptureManager(
         ).also { imageReader = it }
 
         reader.setOnImageAvailableListener({ source ->
-            val image = source.acquireLatestImage() ?: return@setOnImageAvailableListener
+            val image = try {
+                source.acquireLatestImage()
+            } catch (error: RuntimeException) {
+                Log.w(TAG, "ImageReader closed before frame delivery", error)
+                completeCapture(null)
+                return@setOnImageAvailableListener
+            } ?: return@setOnImageAvailableListener
             val bitmap = try {
                 imageToBitmap(image, width, height)
             } finally {

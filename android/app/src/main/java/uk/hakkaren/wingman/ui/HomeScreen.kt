@@ -5,7 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -15,12 +14,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -44,6 +41,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -177,24 +175,17 @@ private fun HeroCard(
         border = BorderStroke(1.dp, WingmanColors.CreamStrong),
         shadowElevation = 1.dp,
     ) {
-        BoxWithConstraints(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 306.dp),
+                .heightIn(min = 306.dp)
+                .padding(horizontal = 22.dp, vertical = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            val compact = maxWidth < 350.dp
-            WingmanLogo(
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .offset(x = if (compact) 24.dp else 18.dp, y = (-6).dp)
-                    .size(if (compact) 112.dp else 144.dp),
-            )
-            Column(
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .widthIn(max = if (compact) 210.dp else 236.dp)
-                    .padding(start = 22.dp, top = 26.dp, bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 Text(
                     text = "軍師已上線",
@@ -202,36 +193,38 @@ private fun HeroCard(
                     fontSize = 31.sp,
                     lineHeight = 36.sp,
                     fontWeight = FontWeight.Black,
+                    modifier = Modifier.weight(1f),
                 )
-                Text(
-                    text = "在 LINE 或任何聊天 App，\n點一下浮動球就能救場",
-                    color = WingmanColors.Muted,
-                    fontSize = 16.sp,
-                    lineHeight = 25.sp,
+                WingmanLogo(modifier = Modifier.size(92.dp))
+            }
+            Text(
+                text = "在 LINE 或任何聊天 App，\n點一下浮動球就能救場",
+                color = WingmanColors.Muted,
+                fontSize = 16.sp,
+                lineHeight = 25.sp,
+            )
+            Button(
+                onClick = onTestBubble,
+                modifier = Modifier.height(52.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = WingmanColors.Orange),
+                contentPadding = PaddingValues(horizontal = 18.dp),
+            ) {
+                WingmanLogo(modifier = Modifier.size(28.dp), contentDescription = null)
+                Spacer(Modifier.width(9.dp))
+                Text("測試浮動球", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            }
+            TextButton(
+                onClick = onInstructions,
+                contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp),
+                colors = ButtonDefaults.textButtonColors(contentColor = WingmanColors.OrangeDark),
+            ) {
+                Text("查看使用方法", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                Icon(
+                    imageVector = Icons.Outlined.KeyboardArrowRight,
+                    contentDescription = null,
+                    modifier = Modifier.size(22.dp),
                 )
-                Button(
-                    onClick = onTestBubble,
-                    modifier = Modifier.height(52.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = WingmanColors.Orange),
-                    contentPadding = PaddingValues(horizontal = 18.dp),
-                ) {
-                    WingmanLogo(modifier = Modifier.size(28.dp), contentDescription = null)
-                    Spacer(Modifier.width(9.dp))
-                    Text("測試浮動球", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                }
-                TextButton(
-                    onClick = onInstructions,
-                    contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp),
-                    colors = ButtonDefaults.textButtonColors(contentColor = WingmanColors.OrangeDark),
-                ) {
-                    Text("查看使用方法", fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                    Icon(
-                        imageVector = Icons.Outlined.KeyboardArrowRight,
-                        contentDescription = null,
-                        modifier = Modifier.size(22.dp),
-                    )
-                }
             }
         }
     }
@@ -274,6 +267,7 @@ private fun PermissionCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 12.dp)
+                        .heightIn(min = 48.dp)
                         .clickable(onClick = onAccessibilityPermission),
                     color = WingmanColors.Cream,
                     shape = RoundedCornerShape(14.dp),
@@ -421,6 +415,13 @@ private fun DailyLessonCard() {
 
 @Composable
 private fun WingmanBottomBar(onUnavailableTab: (String) -> Unit) {
+    val itemColors = NavigationBarItemDefaults.colors(
+        selectedIconColor = WingmanColors.OrangeDark,
+        selectedTextColor = WingmanColors.OrangeDark,
+        indicatorColor = WingmanColors.CreamStrong,
+        unselectedIconColor = WingmanColors.Muted,
+        unselectedTextColor = WingmanColors.Muted,
+    )
     NavigationBar(
         modifier = Modifier.navigationBarsPadding(),
         containerColor = Color.White,
@@ -431,18 +432,21 @@ private fun WingmanBottomBar(onUnavailableTab: (String) -> Unit) {
             onClick = {},
             icon = { Icon(Icons.Default.Home, contentDescription = null) },
             label = { Text("首頁") },
+            colors = itemColors,
         )
         NavigationBarItem(
             selected = false,
             onClick = { onUnavailableTab("紀錄") },
             icon = { Icon(Icons.Outlined.History, contentDescription = null) },
             label = { Text("紀錄") },
+            colors = itemColors,
         )
         NavigationBarItem(
             selected = false,
             onClick = { onUnavailableTab("設定") },
             icon = { Icon(Icons.Outlined.Settings, contentDescription = null) },
             label = { Text("設定") },
+            colors = itemColors,
         )
     }
 }
@@ -460,8 +464,9 @@ private fun InstructionsDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("1. 開啟顯示在其他 App 上層")
-                Text("2. 授權螢幕擷取後，到聊天畫面點孔明帽浮動球")
-                Text("3. 選語氣，填入輸入框或複製；訊息仍由你親自送出")
+                Text("2. 授權螢幕擷取後，到聊天畫面短按孔明帽分析目前畫面")
+                Text("3. 長按孔明帽可從相簿選擇聊天截圖")
+                Text("4. 選語氣，填入輸入框或複製；訊息仍由你親自送出")
                 Text(
                     text = "軍師只分析你當次主動擷取的畫面，不會在背景監看聊天。",
                     color = WingmanColors.Muted,

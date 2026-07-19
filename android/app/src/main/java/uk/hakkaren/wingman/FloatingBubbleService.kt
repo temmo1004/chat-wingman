@@ -15,6 +15,7 @@ import android.graphics.drawable.GradientDrawable
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
 import android.os.IBinder
+import android.provider.Settings
 import android.util.DisplayMetrics
 import android.util.Log
 import android.view.Gravity
@@ -82,12 +83,18 @@ class FloatingBubbleService : Service() {
             )
 
             // 必須先進入 mediaProjection 型前景服務，再取得 MediaProjection。
-            if (capture == null && data != null) {
+            // 每次收到新授權都替換舊 manager，讓使用者停止分享後可以重新授權。
+            if (resultCode == Activity.RESULT_OK && data != null) {
                 val manager = getSystemService(
                     Context.MEDIA_PROJECTION_SERVICE,
                 ) as MediaProjectionManager
                 val projection: MediaProjection = manager.getMediaProjection(resultCode, data)
+                val previousCapture = capture
                 capture = ScreenCaptureManager(projection, displayMetrics())
+                previousCapture?.release()
+                bubble?.visibility = View.VISIBLE
+                isAnalyzing = false
+                analysisToken++
             }
         } catch (error: RuntimeException) {
             Log.e(TAG, "Unable to start MediaProjection pipeline", error)
@@ -96,7 +103,21 @@ class FloatingBubbleService : Service() {
             return START_NOT_STICKY
         }
 
-        if (bubble == null) showBubble()
+        if (bubble == null) {
+            if (!Settings.canDrawOverlays(this)) {
+                Toast.makeText(this, R.string.overlay_permission_missing, Toast.LENGTH_LONG).show()
+                stopSelf(startId)
+                return START_NOT_STICKY
+            }
+            try {
+                showBubble()
+            } catch (error: RuntimeException) {
+                Log.e(TAG, "Unable to show floating bubble", error)
+                Toast.makeText(this, R.string.overlay_unavailable, Toast.LENGTH_LONG).show()
+                stopSelf(startId)
+                return START_NOT_STICKY
+            }
+        }
         return START_NOT_STICKY
     }
 
@@ -135,6 +156,9 @@ class FloatingBubbleService : Service() {
             }
         }
         val bubbleSize = (BUBBLE_SIZE_DP * density).toInt()
+        val edgeMargin = (BUBBLE_EDGE_MARGIN_DP * density).toInt()
+        val screenWidth = resources.displayMetrics.widthPixels
+        val screenHeight = resources.displayMetrics.heightPixels
         val layoutParams = WindowManager.LayoutParams(
             bubbleSize,
             bubbleSize,
@@ -143,8 +167,9 @@ class FloatingBubbleService : Service() {
             PixelFormat.TRANSLUCENT,
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = (24 * density).toInt()
-            y = (160 * density).toInt()
+            x = (screenWidth - bubbleSize - edgeMargin).coerceAtLeast(edgeMargin)
+            y = (screenHeight * BUBBLE_INITIAL_Y_RATIO).toInt()
+                .coerceIn(edgeMargin, (screenHeight - bubbleSize - edgeMargin).coerceAtLeast(edgeMargin))
         }
 
         // 超過 touch slop 才視為拖曳；門檻內放開則透過 performClick 觸發分析。
@@ -188,8 +213,12 @@ class FloatingBubbleService : Service() {
                         view.removeCallbacks(longPress)
                     }
                     if (hasDragged) {
-                        layoutParams.x = initialX + dx.toInt()
-                        layoutParams.y = initialY + dy.toInt()
+                        val maxX = (resources.displayMetrics.widthPixels - bubbleSize - edgeMargin)
+                            .coerceAtLeast(edgeMargin)
+                        val maxY = (resources.displayMetrics.heightPixels - bubbleSize - edgeMargin)
+                            .coerceAtLeast(edgeMargin)
+                        layoutParams.x = (initialX + dx.toInt()).coerceIn(edgeMargin, maxX)
+                        layoutParams.y = (initialY + dy.toInt()).coerceIn(edgeMargin, maxY)
                         runCatching { windowManager.updateViewLayout(view, layoutParams) }
                     }
                     true
@@ -221,6 +250,10 @@ class FloatingBubbleService : Service() {
 
     private fun onBubbleTap() {
         if (isAnalyzing) return
+
+        // 已有結果時先卸下面板，避免舊內容被下一次 MediaProjection 截進去。
+        panel?.dismiss()
+        panel = null
         isAnalyzing = true
         val token = ++analysisToken
         val captureManager = capture
@@ -231,7 +264,7 @@ class FloatingBubbleService : Service() {
             return
         }
 
-        // 截圖前隱藏孔明帽。擷取器開始等畫面後立刻顯示 Loading Panel。
+        // 截圖前隱藏孔明帽；取得影格後才顯示 Loading，避免覆蓋物污染截圖。
         bubble?.visibility = View.INVISIBLE
         try {
             captureManager.captureOnce { bitmap ->
@@ -240,6 +273,7 @@ class FloatingBubbleService : Service() {
                     bitmap?.recycle()
                     return@captureOnce
                 }
+                showPanelLoading()
                 if (bitmap == null) {
                     Toast.makeText(
                         this,
@@ -267,7 +301,6 @@ class FloatingBubbleService : Service() {
                     }
                 }
             }
-            showPanelLoading()
         } catch (error: RuntimeException) {
             Log.e(TAG, "Screenshot request failed", error)
             bubble?.visibility = View.VISIBLE
@@ -428,7 +461,9 @@ class FloatingBubbleService : Service() {
         private const val TAG = "FloatingBubbleService"
         private const val NOTIFICATION_CHANNEL = "wingman"
         private const val NOTIFICATION_ID = 1
-        private const val BUBBLE_SIZE_DP = 64
+        private const val BUBBLE_SIZE_DP = 56
+        private const val BUBBLE_EDGE_MARGIN_DP = 18
+        private const val BUBBLE_INITIAL_Y_RATIO = 0.38f
         private const val MIN_CLICK_THRESHOLD_PX = 20f
         const val EXTRA_RESULT_CODE = "result_code"
         const val EXTRA_DATA = "data"

@@ -6,8 +6,9 @@
     <string name="clipboard_label">聊天軍師回覆</string>
     <string name="notification_channel_name">聊天軍師浮動球</string>
     <string name="notification_title">聊天軍師運作中</string>
-    <string name="notification_text">點孔明帽浮動球取得回覆建議</string>
+    <string name="notification_text">短按分析畫面，長按從相簿選圖</string>
     <string name="capture_service_start_failed">無法啟動螢幕擷取，請回首頁重新授權</string>
+    <string name="overlay_permission_missing">上層顯示權限已關閉，請回首頁重新開啟</string>
     <string name="capture_failed_using_demo">截圖失敗，改用備援建議</string>
     <string name="overlay_unavailable">無法顯示分析面板，請確認上層顯示權限</string>
     <string name="reply_filled">已填入輸入框，確認後由你手動送出</string>
