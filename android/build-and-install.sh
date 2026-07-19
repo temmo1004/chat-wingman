@@ -33,4 +33,4 @@ APK="app/build/outputs/apk/debug/app-debug.apk"
 echo "APK: $APK"
 adb connect "$DEVICE" >/dev/null 2>&1 || true
 adb -s "$DEVICE" install -r "$APK"
-echo "✅ 已裝到 $DEVICE。到模擬器開 app、依序給三個權限，點浮動球。"
+echo "✅ 已裝到 ${DEVICE} — 到模擬器開 app、依序給三個權限，點浮動球。"
