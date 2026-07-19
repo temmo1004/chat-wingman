@@ -92,6 +92,22 @@ Accessibility 點擊常失敗（狀態沒更新）。這正好印證我們的設
 剪貼簿 `ACTION_PASTE` fallback（已內建於 `WingmanAccessibilityService`），
 且 demo 走 DEMO_ONLY 本地資料不依賴此路徑。
 
+### ✅ IG Lite DM 實測（登入的真實對話，2026-07-19）
+
+進到 Instagram Lite 的 DM 對話串，dump 底部訊息輸入框：
+
+- class = **`android.widget.EditText`**（原生！非 Compose/RN 自繪）
+- **無 resource-id**、無 content-desc
+- bounds `[109,1512][668,1553]`（底部訊息列）
+
+意義：
+1. 原生 EditText → **`ACTION_SET_TEXT` 應直接有效**，不會被 Compose 靜默擋
+2. 無 resource-id → **證明語意查找（找可編輯 EditText）才對**，`findViewById`
+   路線在這裡完全失效——我們的 `findEditable()` 正好命中
+3. 這是「截圖 vision 讀對話 + 節點樹填字」雙軌的最佳案例：IG DM 兩邊都吃得下
+
+（未在真實 DM 打字避免誤送；待 app 裝好用 AccessibilityService 實填驗證。）
+
 ## 今日實作第一步（省時）
 
 在跑 LINE 的模擬器上：
