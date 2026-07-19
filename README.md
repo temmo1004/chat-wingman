@@ -55,4 +55,5 @@ GPT-4o vision 讀圖 → 判讀語境
 ## 目錄
 
 - `backend/` — Flask `/api/wingman`（GPT-4o vision + demo 模式）
+- `android/` — Kotlin 浮動球 app（球 + 截圖 + 無障礙填字 + 面板）
 - `ios/` — 捷徑建構指南 + 後端接點測試腳本

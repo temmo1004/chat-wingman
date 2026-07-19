@@ -68,8 +68,9 @@ app 抓 MediaStore 最新一張截圖」，少一步但穩，demo 照樣成立�
 
 ## 風險
 
-- Android 14+：前景服務要宣告 `foregroundServiceType="mediaProjection"`；
-  模擬器建議 API 34 image
+- Android 14+：前景服務要宣告 `foregroundServiceType="mediaProjection"`，
+  且無投影 token 不能啟動該型服務——**demo 建議用 API 33（Android 13）模擬器**，
+  MediaProjection 規則較寬（見 android/README.md）
 - 「顯示在其他應用程式上層」權限模擬器要手動開，demo 前先開好
 - 現場網路爛／API 掛：C 的 demo 模式開關走本地假資料
 - 時間不夠的砍功能順序：人格側寫 → 拍照 → 聊死指數；
