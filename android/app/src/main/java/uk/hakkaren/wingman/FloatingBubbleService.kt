@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.graphics.drawable.GradientDrawable
 import android.graphics.PixelFormat
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
@@ -15,6 +16,7 @@ import android.util.DisplayMetrics
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewOutlineProvider
 import android.view.WindowManager
 import android.widget.ImageView
 import android.widget.Toast
@@ -67,11 +69,23 @@ class FloatingBubbleService : Service() {
     private fun showBubble() {
         wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         val view = ImageView(this).apply {
-            setImageResource(R.drawable.ic_bubble)
+            setImageResource(R.drawable.ic_launcher_foreground)
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            val iconPadding = (4 * resources.displayMetrics.density).toInt()
+            setPadding(iconPadding, iconPadding, iconPadding, iconPadding)
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(this@FloatingBubbleService.getColor(R.color.launcher_icon_background))
+            }
+            outlineProvider = ViewOutlineProvider.BACKGROUND
+            clipToOutline = true
+            elevation = 12f * resources.displayMetrics.density
+            contentDescription = getString(R.string.bubble_content_description)
         }
+        val bubbleSize = (64 * resources.displayMetrics.density).toInt()
         val lp = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
+            bubbleSize,
+            bubbleSize,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT,

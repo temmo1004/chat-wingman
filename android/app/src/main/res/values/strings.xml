@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">聊天軍師</string>
+    <string name="bubble_content_description">開啟聊天軍師分析</string>
     <string name="accessibility_desc">開啟後，軍師可把建議的回覆直接填入聊天輸入框（送出仍由你手動按）。僅在你點擊浮動球時作用，不背景監控。</string>
 </resources>
