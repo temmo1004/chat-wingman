@@ -148,6 +148,7 @@ class FloatingBubbleService : Service() {
             showPanel(LocalDemo.result)
             return
         }
+        showPanelLoading()
         scope.launch {
             val result = try {
                 withContext(Dispatchers.IO) { WingmanApi.analyze(png, demo) }
@@ -161,19 +162,51 @@ class FloatingBubbleService : Service() {
     }
 
     private fun showPanel(result: WingmanResult) {
+        ensurePanel().show(result)
+    }
+
+    private fun showPanelLoading() {
+        ensurePanel().showLoading()
+    }
+
+    private fun ensurePanel(): OverlayPanel {
+        return panel ?: OverlayPanel(
+            ctx = this,
+            onFill = ::fillReply,
+            onCopy = ::copyReply,
+            onRefresh = {
+                panel?.dismiss()
+                panel = null
+                onBubbleTap()
+            },
+            onDismissed = { panel = null },
+        ).also { panel = it }
+    }
+
+    private fun fillReply(reply: Reply) {
+        val filled = WingmanAccessibilityService.fill(reply.text)
+        if (!filled) {
+            copyReply(reply, dismiss = false)
+            Toast.makeText(this, "無法自動填入，已改為複製", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(this, "已填入輸入框，確認後按送出", Toast.LENGTH_SHORT).show()
+        }
         panel?.dismiss()
-        panel = OverlayPanel(this) { reply ->
-            // 點卡片：優先用無障礙填字，沒開就退回複製到剪貼簿
-            val filled = WingmanAccessibilityService.fill(reply.text)
-            if (!filled) {
-                val cm = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                cm.setPrimaryClip(android.content.ClipData.newPlainText("wingman", reply.text))
-                Toast.makeText(this, "已複製，回聊天長按貼上", Toast.LENGTH_SHORT).show()
-            } else {
-                Toast.makeText(this, "已填入輸入框，按送出即可", Toast.LENGTH_SHORT).show()
-            }
+        panel = null
+    }
+
+    private fun copyReply(reply: Reply) {
+        copyReply(reply, dismiss = true)
+    }
+
+    private fun copyReply(reply: Reply, dismiss: Boolean) {
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("wingman", reply.text))
+        if (dismiss) {
+            Toast.makeText(this, "已複製回覆", Toast.LENGTH_SHORT).show()
             panel?.dismiss()
-        }.also { it.show(result) }
+            panel = null
+        }
     }
 
     // ── 前景通知 ─────────────────────────────────────────
@@ -184,7 +217,7 @@ class FloatingBubbleService : Service() {
         }
         return Notification.Builder(this, CHANNEL)
             .setContentTitle("聊天軍師運作中")
-            .setContentText("點浮動球取得回覆建議")
+            .setContentText("點孔明帽浮動球取得回覆建議")
             .setSmallIcon(R.drawable.ic_bubble)
             .build()
     }
