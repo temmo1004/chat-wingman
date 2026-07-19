@@ -129,13 +129,18 @@ class FloatingBubbleService : Service() {
 
     // ── 打後端 + 顯示面板 ─────────────────────────────────
     private fun analyze(png: ByteArray?, demo: Boolean) {
+        // DEMO_ONLY：完全不碰網路，直接用本地範本（後端未部署時 demo 用）
+        if (BuildConfig.DEMO_ONLY) {
+            showPanel(LocalDemo.result)
+            return
+        }
         scope.launch {
             val result = try {
                 withContext(Dispatchers.IO) { WingmanApi.analyze(png, demo) }
             } catch (e: Exception) {
-                // 失敗保底：再試 demo，斷網也能演
+                // 失敗保底：再試後端 demo 模式，再不行退本地範本，斷網也能演
                 try { withContext(Dispatchers.IO) { WingmanApi.analyze(null, demo = true) } }
-                catch (e2: Exception) { Toast.makeText(this@FloatingBubbleService, "分析失敗", Toast.LENGTH_SHORT).show(); return@launch }
+                catch (e2: Exception) { LocalDemo.result }
             }
             showPanel(result)
         }
