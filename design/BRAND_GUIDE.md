@@ -51,7 +51,7 @@
 | 背景 | 使用方式 |
 |---|---|
 | `#F9E9D3` Brand Cream | 首選品牌保護底、Launcher 背景、浮動球底與小尺寸容器。 |
-| `#FFFCF8` Warm White | 首頁背景；使用清邊透明品牌圖。 |
+| `#FFF9F3` Warm White | 首頁背景；使用清邊透明品牌圖。 |
 | `#FFFFFF` Surface | Card／Dialog；使用清邊透明品牌圖並保留 clear space。 |
 | 深色或照片背景 | 僅使用透明 Master／`brand_kongming_hat`。若帽帶或橘色漸層辨識不穩定，改放在 `#F9E9D3` 不透明保護容器內。 |
 
@@ -80,7 +80,7 @@
 
 - Foreground layer 的設計座標為 **108×108dp**；背景固定為 `#F9E9D3`。
 - 所有關鍵可見內容必須落在中心 **66×66dp 的保證安全圓**內，即距中心不超過 33dp。
-- 目前衍生規則以約 `52/108` 的內容高度保留五片帽面及垂帶，同時預留 mask 與視差動畫空間。修改比例後必須重新檢查最遠 opaque pixel，不能只看方形預覽。
+- 目前衍生規則以約 `51/108` 的內容高度保留五片帽面及垂帶，同時預留 mask 與視差動畫空間。修改比例後必須重新檢查最遠 alpha pixel，不能只看方形預覽。
 - Foreground 外圍保持透明；不可把米色方底烘焙進 Adaptive 前景。
 - 必須預覽 circle、rounded square、squircle 與 OEM mask；帽頂、左右帽面及垂帶都不可被裁。
 - `android:icon` 使用 `@mipmap/ic_launcher`；`android:roundIcon` 使用 `@mipmap/ic_launcher_round`。Round 資源需要獨立存在，不依賴 Launcher 臨時裁切。
@@ -124,7 +124,7 @@
 | 載入狀態 | 一個 72dp 靜態孔明帽 + Material Progress Indicator；不旋轉或彈跳 Logo。 |
 | 使用方法 Dialog | 若需要品牌識別，最多一個主 Logo；不可與 Loading／Hero 同畫面重複堆疊。 |
 | Permission、一般 Card | 不放 Logo；使用 Shield、Info、Check 等 Material Icons。 |
-| 首頁導覽 | 不提供底部分頁；產品只保留首頁與聊天上的浮動分析面板。 |
+| 首頁導覽 | 顯示「首頁／紀錄／設定」底部導覽；本輪只有首頁是實際頁面，紀錄與設定只顯示簡短提示、不導向空白頁，因此產品仍只保留首頁與聊天上的浮動分析面板兩個主要介面。 |
 | Android 通知列 | 只使用 `ic_stat_kongming_hat` 單色 Small Icon。 |
 
 ### 8.1 Logo 密度限制
@@ -150,7 +150,7 @@
 ## 10. 品牌驗證清單
 
 - [ ] 原始 Master 仍為 1254×1254 且未被透明衍生檔覆蓋。
-- [ ] 透明 Master 在黑、深藍、白、`#FFFCF8` 與 `#F9E9D3` 上沒有米白／白色毛邊。
+- [ ] 透明 Master 在黑、深藍、白、`#FFF9F3` 與 `#F9E9D3` 上沒有米白／白色毛邊。
 - [ ] 橘色漸層與焦糖帽帶在所有核准背景仍可辨認。
 - [ ] 24、28、32、48、64dp 下仍看得出五片帽面、帽帶與外輪廓。
 - [ ] Adaptive 前景關鍵內容位於 66×66dp 保證安全圓內。
@@ -158,4 +158,4 @@
 - [ ] 方形、圓形、themed icon 與 Play Store 圖各自使用正確資源。
 - [ ] 通知 Small Icon 在淺／深系統主題與不同密度上由系統正確著色。
 - [ ] Hero、測試按鈕、真實浮動球與 Loading 使用正確版本及尺寸。
-- [ ] Permission 與一般 Card 沒有重複放置 Logo，首頁沒有額外分頁導覽。
+- [ ] Permission 與一般 Card 沒有重複放置 Logo；底部導覽只有首頁可用，紀錄與設定顯示簡短提示且不開啟空白頁。

@@ -4,6 +4,10 @@
 # Generated UI research output; product tokens live in WingmanTheme.kt.
 /design-system/
 
+# Local Product Design visual-QA evidence; final UI lives in Android sources.
+/design-qa.md
+/design/qa/
+
 # Local PR drafting files and macOS metadata.
 /.pr-body-*.md
 .DS_Store

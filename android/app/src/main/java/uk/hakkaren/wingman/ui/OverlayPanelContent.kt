@@ -602,6 +602,7 @@ private fun LoadingPanel() {
         WingmanLogo(
             modifier = Modifier.size(72.dp),
             contentDescription = "孔明帽軍師正在分析",
+            variant = WingmanLogoVariant.Loading,
         )
         Spacer(Modifier.height(WingmanSpacing.Medium))
         CircularProgressIndicator(color = WingmanColors.Primary, strokeWidth = 3.dp)

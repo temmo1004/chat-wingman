@@ -133,32 +133,46 @@ private fun WingmanBottomBar(onUnavailableTab: (String) -> Unit) {
         unselectedIconColor = WingmanColors.TextSecondary,
         unselectedTextColor = WingmanColors.TextSecondary,
     )
-    NavigationBar(
-        modifier = Modifier.navigationBarsPadding(),
-        containerColor = WingmanColors.Card,
-        tonalElevation = 0.dp,
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(horizontal = WingmanSpacing.Large, vertical = WingmanSpacing.Small),
     ) {
-        NavigationBarItem(
-            selected = true,
-            onClick = {},
-            icon = { Icon(Icons.Default.Home, contentDescription = null) },
-            label = { Text("首頁") },
-            colors = colors,
-        )
-        NavigationBarItem(
-            selected = false,
-            onClick = { onUnavailableTab("紀錄") },
-            icon = { Icon(Icons.Outlined.History, contentDescription = null) },
-            label = { Text("紀錄") },
-            colors = colors,
-        )
-        NavigationBarItem(
-            selected = false,
-            onClick = { onUnavailableTab("設定") },
-            icon = { Icon(Icons.Outlined.Settings, contentDescription = null) },
-            label = { Text("設定") },
-            colors = colors,
-        )
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = WingmanColors.Card,
+            shape = WingmanShapes.Card,
+            border = BorderStroke(1.dp, WingmanColors.Border),
+            shadowElevation = 2.dp,
+        ) {
+            NavigationBar(
+                containerColor = Color.Transparent,
+                tonalElevation = 0.dp,
+            ) {
+                NavigationBarItem(
+                    selected = true,
+                    onClick = {},
+                    icon = { Icon(Icons.Default.Home, contentDescription = null) },
+                    label = { Text("首頁") },
+                    colors = colors,
+                )
+                NavigationBarItem(
+                    selected = false,
+                    onClick = { onUnavailableTab("紀錄") },
+                    icon = { Icon(Icons.Outlined.History, contentDescription = null) },
+                    label = { Text("紀錄") },
+                    colors = colors,
+                )
+                NavigationBarItem(
+                    selected = false,
+                    onClick = { onUnavailableTab("設定") },
+                    icon = { Icon(Icons.Outlined.Settings, contentDescription = null) },
+                    label = { Text("設定") },
+                    colors = colors,
+                )
+            }
+        }
     }
 }
 
@@ -219,7 +233,7 @@ private fun HeroCard(
     ) {
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
             val largeText = LocalDensity.current.fontScale > 1.2f
-            val stacked = maxWidth < 360.dp || largeText
+            val stacked = maxWidth < 320.dp || largeText
 
             Column(
                 modifier = Modifier.padding(WingmanSpacing.Large),
@@ -241,7 +255,7 @@ private fun HeroCard(
                     ) {
                         HeroMessage(modifier = Modifier.weight(1f))
                         WingmanLogo(
-                            modifier = Modifier.size(104.dp),
+                            modifier = Modifier.size(120.dp),
                             contentDescription = "孔明帽軍師主視覺",
                             variant = WingmanLogoVariant.Hero,
                         )
@@ -615,6 +629,7 @@ private fun WingmanHomeLargeTextPreview() {
             onOverlayPermission = {},
             onCapturePermission = {},
             onAccessibilityPermission = {},
+            onUnavailableTab = {},
         )
     }
 }

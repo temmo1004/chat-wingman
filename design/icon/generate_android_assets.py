@@ -40,9 +40,9 @@ VALIDATION_BOARD = ICON_DIR / "chat-wingman-brand-validation.png"
 UI_ASSET = RES_DIR / "drawable-nodpi" / "brand_kongming_hat.png"
 
 BRAND_CREAM = (249, 233, 211)  # #F9E9D3
-WARM_WHITE = (255, 252, 248)   # #FFFCF8
+WARM_WHITE = (255, 249, 243)   # #FFF9F3
 SURFACE = (255, 255, 255)
-INK = (23, 19, 15)             # #17130F
+INK = (29, 23, 18)             # #1D1712
 
 DENSITIES = {
     "mdpi": 1.0,
@@ -277,12 +277,12 @@ def main() -> None:
     save_png(master.resize((512, 512), Image.Resampling.LANCZOS), PLAY_STORE)
 
     # Android Adaptive layers: the farthest opaque point stays inside the
-    # guaranteed 33dp-radius safe circle.  52/108 content height preserves
+    # guaranteed 33dp-radius safe circle.  51/108 content height preserves
     # readability while leaving mask/animation headroom.
-    adaptive_xxxhdpi = square_mark(cutout, 432, content_height_ratio=52 / 108)
+    adaptive_xxxhdpi = square_mark(cutout, 432, content_height_ratio=51 / 108)
     for density, scale in DENSITIES.items():
         foreground_size = round(108 * scale)
-        foreground = square_mark(cutout, foreground_size, content_height_ratio=52 / 108)
+        foreground = square_mark(cutout, foreground_size, content_height_ratio=51 / 108)
         save_png(
             foreground,
             RES_DIR / f"drawable-{density}" / "ic_launcher_foreground.png",
