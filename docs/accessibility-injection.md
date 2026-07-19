@@ -76,6 +76,22 @@ Accessibility 點擊常失敗（狀態沒更新）。這正好印證我們的設
     （[服務型別清單](https://developer.android.com/develop/background-work/services/fgs/service-types)）
   - 已知痛點參考：[droidVNC-NG #195](https://github.com/bk138/droidVNC-NG/issues/195)（a11y + 投影共存的實例）
 
+## 實機掃描（MuMu Android 12，2026-07-19）
+
+在 MuMu 模擬器裝了一批真交友軟體，用 `uiautomator dump` 掃各 app 啟動畫面的
+輸入框框架：
+
+| App | 啟動畫面輸入框 | 判讀 |
+|---|---|---|
+| Badoo | 原生 `EditText` | SET_TEXT 應有效 |
+| Bumble | 原生 `EditText` | SET_TEXT 應有效 |
+| CoffeeMeetsBagel / iPart / JustDating / Yueme / Boo / HeyMandi / Doki / Dopa | 啟動頁是 onboarding、無輸入框 | 未定，須登入進聊天再驗 |
+
+結論：主流交友 app（Badoo/Bumble）用原生輸入框，`ACTION_SET_TEXT` 有機會直接通；
+其餘要登入到聊天畫面才能確認框架。無論如何，抓不到 EditText 的一律走
+剪貼簿 `ACTION_PASTE` fallback（已內建於 `WingmanAccessibilityService`），
+且 demo 走 DEMO_ONLY 本地資料不依賴此路徑。
+
 ## 今日實作第一步（省時）
 
 在跑 LINE 的模擬器上：
