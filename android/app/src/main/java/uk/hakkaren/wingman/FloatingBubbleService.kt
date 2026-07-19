@@ -6,6 +6,8 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.drawable.GradientDrawable
 import android.graphics.PixelFormat
 import android.media.projection.MediaProjection
@@ -25,7 +27,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.ByteArrayOutputStream
 import kotlin.math.abs
 
 /**
@@ -127,41 +128,39 @@ class FloatingBubbleService : Service() {
     }
 
     private fun onBubbleTap() {
-        val cap = capture
-        if (cap == null) {
-            // 沒有截圖授權 → 走 demo，讓流程仍可 demo
-            analyze(null, demo = true)
-            return
-        }
-        // 收球一下避免截到自己（可選：暫時隱藏 bubble）
+        // DEMO_ONLY：不截圖、不 OCR、不連網，直接本地範本
+        if (BuildConfig.DEMO_ONLY) { showPanel(LocalDemo.result); return }
+        val cap = capture ?: run { showPanel(LocalDemo.result); return }
+        // 收球避免截到自己
         bubble?.visibility = View.INVISIBLE
         cap.captureOnce { bmp ->
             bubble?.visibility = View.VISIBLE
-            if (bmp == null) {
-                Toast.makeText(this, "截圖失敗，改用範例", Toast.LENGTH_SHORT).show()
-                analyze(null, demo = true)
-            } else {
-                val png = ByteArrayOutputStream().use {
-                    bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 90, it); it.toByteArray()
-                }
-                analyze(png, demo = false)
-            }
+            if (bmp == null) { showPanel(LocalDemo.result); return@captureOnce }
+            ocrThenAnalyze(bmp)
         }
     }
 
-    // ── 打後端 + 顯示面板 ─────────────────────────────────
-    private fun analyze(png: ByteArray?, demo: Boolean) {
-        // DEMO_ONLY：完全不碰網路，直接用本地範本（後端未部署時 demo 用）
-        if (BuildConfig.DEMO_ONLY) {
-            showPanel(LocalDemo.result)
-            return
-        }
-        showPanelLoading()
+    /** 相簿選的圖：解碼 → OCR → 分析。 */
+    private fun analyzeAlbumBitmap(bytes: ByteArray) {
+        if (BuildConfig.DEMO_ONLY) { showPanel(LocalDemo.result); return }
+        val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+            ?: run { showPanel(LocalDemo.result); return }
+        ocrThenAnalyze(bmp)
+    }
+
+    // ── OCR → 打後端 → 顯示面板 ───────────────────────────
+    /** 手機端 OCR 截圖成對話文字，再送後端。圖片不離開手機。 */
+    private fun ocrThenAnalyze(bmp: Bitmap) {
+        OcrHelper.extract(bmp) { text -> analyze(text) }
+    }
+
+    private fun analyze(text: String) {
+        showPanelLoading()  // 先顯示 loading（隊友 Compose 面板 UX）
         scope.launch {
             val result = try {
-                withContext(Dispatchers.IO) { WingmanApi.analyze(png, demo) }
+                withContext(Dispatchers.IO) { WingmanApi.analyze(text, demo = false) }
             } catch (e: Exception) {
-                // 失敗保底：再試後端 demo 模式，再不行退本地範本，斷網也能演
+                // 失敗保底：後端 demo 模式，再不行退本地範本，斷網也能演
                 try { withContext(Dispatchers.IO) { WingmanApi.analyze(null, demo = true) } }
                 catch (e2: Exception) { LocalDemo.result }
             }
@@ -260,9 +259,9 @@ class FloatingBubbleService : Service() {
         var instance: FloatingBubbleService? = null
             private set
 
-        /** 給 PickerActivity 呼叫：分析從相簿選的圖，彈出面板。 */
+        /** 給 PickerActivity 呼叫：OCR 相簿選的圖 → 分析 → 彈面板。 */
         fun analyzeAlbumImage(png: ByteArray) {
-            instance?.analyze(png, demo = false)
+            instance?.analyzeAlbumBitmap(png)
         }
 
         fun start(ctx: Context, resultCode: Int, data: Intent) {

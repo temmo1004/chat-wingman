@@ -1,7 +1,6 @@
 package uk.hakkaren.wingman
 
 import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -9,7 +8,7 @@ import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 /**
- * 打後端 POST /api/wingman。金鑰留在後端，客戶端只送截圖。
+ * 打後端 POST /api/wingman。送 OCR 出的「對話文字」（不送圖，圖在手機端 OCR）。
  * 呼叫端請在 IO thread / coroutine 執行（同步阻塞）。
  */
 object WingmanApi {
@@ -18,22 +17,14 @@ object WingmanApi {
         .callTimeout(35, TimeUnit.SECONDS)
         .build()
 
-    /** @param png 截圖的 PNG bytes；demo=true 時後端回寫死範本（斷網可演）。 */
-    fun analyze(png: ByteArray?, demo: Boolean = false): WingmanResult {
-        val form = MultipartBody.Builder().setType(MultipartBody.FORM)
-            .addFormDataPart("locale", "zh-TW")
-        if (demo) {
-            form.addFormDataPart("demo", "true")
-        } else {
-            requireNotNull(png) { "png required when demo=false" }
-            form.addFormDataPart(
-                "image", "screen.png",
-                png.toRequestBody("image/png".toMediaType()),
-            )
-        }
+    /** @param text OCR 出的對話文字；demo=true 時後端回寫死範本（斷網可演）。 */
+    fun analyze(text: String?, demo: Boolean = false): WingmanResult {
+        val json = JSONObject()
+        if (demo) json.put("demo", true) else json.put("text", text.orEmpty())
+        val body = json.toString().toRequestBody("application/json".toMediaType())
         val req = Request.Builder()
             .url("${BuildConfig.BACKEND_URL}/api/wingman")
-            .post(form.build())
+            .post(body)
             .build()
 
         client.newCall(req).execute().use { resp ->
