@@ -7,7 +7,7 @@ package uk.hakkaren.wingman
 object LocalDemo {
     val result = WingmanResult(
         chatDeathIndex = 78,
-        context = "對方只回「哈哈」「還好」，明顯在敷衍，話題快斷了",
+        context = "對方只回「哈哈」「還好」，話題快斷了",
         replies = listOf(
             Reply("認真", "感覺你今天有點累？如果想聊我隨時都在，不想聊也沒關係～",
                 "先關心情緒、給對方台階，把壓力拿掉反而更願意回"),
