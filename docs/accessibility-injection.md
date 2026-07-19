@@ -104,7 +104,8 @@ Accessibility 點擊常失敗（狀態沒更新）。這正好印證我們的設
 1. 原生 EditText → **`ACTION_SET_TEXT` 應直接有效**，不會被 Compose 靜默擋
 2. 無 resource-id → **證明語意查找（找可編輯 EditText）才對**，`findViewById`
    路線在這裡完全失效——我們的 `findEditable()` 正好命中
-3. 這是「截圖 vision 讀對話 + 節點樹填字」雙軌的最佳案例：IG DM 兩邊都吃得下
+3. 這是「截圖在手機端 OCR 讀對話 + 節點樹填字」雙軌的最佳案例：
+   IG DM 兩邊都吃得下，而且圖片不需要上傳後端
 
 （未在真實 DM 打字避免誤送；待 app 裝好用 AccessibilityService 實填驗證。）
 

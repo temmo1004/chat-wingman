@@ -1,5 +1,8 @@
 # 市場調查（2026-07-19）
 
+> **Historical research / 歷史研究快照**：本文保留競品與早期架構參考；
+> 現行實作為手機端 OCR + DeepSeek 純文字後端，以 [API 合約](api.md) 為準。
+>
 > 更深入的多來源對抗式驗證版本見 [deep-research.md](deep-research.md)——
 > 含 Arc/Crystal Ball/CheckMate 三大先例對照、Google Play 與 LINE 合規結論、
 > 以及 **pitch 禁用的 Rizz 數據清單**。
