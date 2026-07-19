@@ -249,19 +249,19 @@ private fun ResultPanel(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Button(
-                    onClick = { onFill(selectedReply) },
+                    onClick = { onCopy(selectedReply) },
                     modifier = Modifier
                         .weight(1.55f)
                         .heightIn(min = 52.dp),
                     shape = RoundedCornerShape(15.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = WingmanColors.Orange),
                 ) {
-                    Icon(Icons.Outlined.Edit, contentDescription = null)
+                    Icon(Icons.Outlined.ContentCopy, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
-                    Text("填入輸入框", fontWeight = FontWeight.Bold)
+                    Text("複製回覆", fontWeight = FontWeight.Bold)
                 }
                 OutlinedButton(
-                    onClick = { onCopy(selectedReply) },
+                    onClick = { onFill(selectedReply) },
                     modifier = Modifier
                         .weight(1f)
                         .heightIn(min = 52.dp),
@@ -269,9 +269,9 @@ private fun ResultPanel(
                     border = BorderStroke(1.dp, WingmanColors.Border),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = WingmanColors.Ink),
                 ) {
-                    Icon(Icons.Outlined.ContentCopy, contentDescription = null)
+                    Icon(Icons.Outlined.Edit, contentDescription = null)
                     Spacer(Modifier.width(6.dp))
-                    Text("複製", fontWeight = FontWeight.Bold)
+                    Text("填入", fontWeight = FontWeight.Bold)
                 }
             }
         }
