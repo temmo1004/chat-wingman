@@ -3,27 +3,26 @@
 後端負責人：bath。此合約敲定後，前端（Android / iOS 捷徑）可先用假資料
 並行開發，不必等後端完成。**改這份要先講**，因為兩端都依賴它。
 
-## 為什麼要中轉後端
+## 架構：手機端 OCR + DeepSeek
 
-- **保護金鑰**：iOS 捷徑（隨 iCloud 連結外洩）與 Android APK 都不能寫死
-  OpenAI key；key 只留在後端
-- **集中 prompt**：C 調的 system prompt 放後端，iOS/Android 共用，改 prompt
-  不用重發客戶端
+DeepSeek API 純文字、不吃圖，所以**讀截圖在 Android 端用 ML Kit OCR**，
+後端只收 OCR 出的對話文字、交 DeepSeek 生成回覆。好處：圖片不離開手機、
+只送文字、最省、資安最好。
+
+- **保護金鑰**：DeepSeek key 只留後端，客戶端不碰
+- **集中 prompt**：C 調的 system prompt 放後端
 - **demo 模式**：斷網/API 掛時後端直接回寫死範本
 
 ## 端點
 
 ### `POST /api/wingman`
 
-**請求**（擇一）：
-- JSON：`{ "image": "<base64 PNG>", "locale": "zh-TW", "demo": false }`
-- 或 multipart/form-data：`image` 檔案欄位 + `locale` 欄位
+**請求**（JSON）：`{ "text": "<OCR 出的對話文字>", "demo": false }`
 
 | 欄位 | 型別 | 必填 | 說明 |
 |---|---|---|---|
-| image | string(base64) 或檔案 | 是 | 聊天畫面截圖；建議客戶端先壓到寬 ≤1080 / JPEG，避免逾時 |
-| locale | string | 否 | 預設 `zh-TW` |
-| demo | bool | 否 | `true` 時回寫死範本，不打 API |
+| text | string | 是 | Android 端 OCR 出的對話文字；建議每行前綴 `對方:` / `我:`（靠左右氣泡判斷） |
+| demo | bool | 否 | `true` 時回寫死範本，不打 DeepSeek |
 
 **回應 200**：
 ```json

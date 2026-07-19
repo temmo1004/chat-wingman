@@ -643,7 +643,7 @@ private fun ErrorPanel(message: String, onRefresh: () -> Unit) {
         Text("這次沒看清楚", style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(WingmanSpacing.Small))
         Text(
-            text = message,
+            text = message.ifBlank { "請確認聊天畫面後再試一次。" },
             color = WingmanColors.TextSecondary,
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,

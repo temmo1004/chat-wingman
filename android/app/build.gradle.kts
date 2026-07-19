@@ -57,6 +57,8 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    // 手機端 OCR（中文，bundled 模型，免 Google Play Services）
+    implementation("com.google.mlkit:text-recognition-chinese:16.0.1")
 
     debugImplementation(composeBom)
     debugImplementation("androidx.compose.ui:ui-tooling")

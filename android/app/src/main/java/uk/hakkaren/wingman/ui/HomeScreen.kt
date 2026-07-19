@@ -123,7 +123,6 @@ fun WingmanHomeScreen(
         )
     }
 }
-
 @Composable
 private fun WingmanBottomBar(onUnavailableTab: (String) -> Unit) {
     val colors = NavigationBarItemDefaults.colors(
