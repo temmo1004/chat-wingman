@@ -94,21 +94,29 @@ class FloatingBubbleService : Service() {
             x = 24; y = 300
         }
 
-        // 拖曳 + 點擊判定
+        // 拖曳 + 短按（截圖）+ 長按（相簿）判定
         var downX = 0f; var downY = 0f; var lpX = 0; var lpY = 0
+        var longPressed = false
+        val longPress = Runnable { longPressed = true; openAlbum() }
         view.setOnTouchListener { _, e ->
             when (e.action) {
                 MotionEvent.ACTION_DOWN -> {
-                    downX = e.rawX; downY = e.rawY; lpX = lp.x; lpY = lp.y; true
+                    downX = e.rawX; downY = e.rawY; lpX = lp.x; lpY = lp.y
+                    longPressed = false
+                    view.postDelayed(longPress, 500)  // 長按 500ms → 相簿
+                    true
                 }
                 MotionEvent.ACTION_MOVE -> {
+                    val moved = abs(e.rawX - downX) + abs(e.rawY - downY)
+                    if (moved > 20) view.removeCallbacks(longPress)  // 拖曳取消長按
                     lp.x = lpX + (e.rawX - downX).toInt()
                     lp.y = lpY + (e.rawY - downY).toInt()
                     wm.updateViewLayout(view, lp); true
                 }
                 MotionEvent.ACTION_UP -> {
+                    view.removeCallbacks(longPress)
                     val moved = abs(e.rawX - downX) + abs(e.rawY - downY)
-                    if (moved < 20) onBubbleTap()  // 幾乎沒移動 → 當作點擊
+                    if (!longPressed && moved < 20) onBubbleTap()  // 短按 → 截當前畫面
                     true
                 }
                 else -> false
@@ -222,7 +230,20 @@ class FloatingBubbleService : Service() {
             .build()
     }
 
+    /** 開系統相片選擇器（不需儲存權限）。由長按浮動球觸發。 */
+    private fun openAlbum() {
+        val i = Intent(this, PickerActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        startActivity(i)
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        instance = this
+    }
+
     override fun onDestroy() {
+        if (instance === this) instance = null
         bubble?.let { runCatching { wm.removeView(it) } }
         panel?.dismiss()
         capture?.release()
@@ -234,6 +255,15 @@ class FloatingBubbleService : Service() {
         private const val NOTIF_ID = 1
         const val EXTRA_RESULT_CODE = "result_code"
         const val EXTRA_DATA = "data"
+
+        @Volatile
+        var instance: FloatingBubbleService? = null
+            private set
+
+        /** 給 PickerActivity 呼叫：分析從相簿選的圖，彈出面板。 */
+        fun analyzeAlbumImage(png: ByteArray) {
+            instance?.analyze(png, demo = false)
+        }
 
         fun start(ctx: Context, resultCode: Int, data: Intent) {
             val i = Intent(ctx, FloatingBubbleService::class.java).apply {

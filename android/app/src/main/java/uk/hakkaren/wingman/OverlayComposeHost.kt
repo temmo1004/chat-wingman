@@ -3,7 +3,6 @@ package uk.hakkaren.wingman
 import android.content.Context
 import android.graphics.PixelFormat
 import android.view.Gravity
-import android.view.View
 import android.view.WindowManager
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.ComposeView
@@ -28,6 +27,7 @@ class OverlayComposeHost(
     private val lifecycleRegistry = LifecycleRegistry(this)
     private val store = ViewModelStore()
     private val savedStateController = SavedStateRegistryController.create(this).apply {
+        performAttach()
         performRestore(null)
     }
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
@@ -57,20 +57,26 @@ class OverlayComposeHost(
         ).apply {
             gravity = Gravity.BOTTOM
         }
-        windowManager.addView(view, params)
-        composeView = view
-        lifecycleRegistry.currentState = Lifecycle.State.RESUMED
-    }
-
-    fun setVisible(visible: Boolean) {
-        composeView?.visibility = if (visible) View.VISIBLE else View.GONE
+        try {
+            windowManager.addView(view, params)
+            composeView = view
+            lifecycleRegistry.currentState = Lifecycle.State.RESUMED
+        } catch (error: Throwable) {
+            lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
+            view.disposeComposition()
+            store.clear()
+            throw error
+        }
     }
 
     fun destroy() {
-        composeView?.let { view ->
+        val view = composeView
+        composeView = null
+        if (lifecycleRegistry.currentState != Lifecycle.State.DESTROYED) {
             lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
+        }
+        if (view != null) {
             runCatching { windowManager.removeView(view) }
-            composeView = null
         }
         store.clear()
     }

@@ -38,28 +38,31 @@ class OverlayPanel(
 
     private fun ensureShown() {
         if (host != null) return
-        host = OverlayComposeHost(ctx).also { overlayHost ->
+        val overlayHost = OverlayComposeHost(ctx)
+        host = overlayHost
+        try {
             overlayHost.show {
                 WingmanTheme {
                     WingmanOverlayPanel(
                         state = state,
                         onFill = onFill,
                         onCopy = onCopy,
-                        onDismiss = ::dismissFromUi,
+                        onDismiss = ::dismiss,
                         onRefresh = onRefresh,
                     )
                 }
             }
+        } catch (error: Throwable) {
+            host = null
+            overlayHost.destroy()
+            throw error
         }
     }
 
-    private fun dismissFromUi() {
-        dismiss()
-        onDismissed()
-    }
-
     fun dismiss() {
-        host?.destroy()
+        val overlayHost = host ?: return
         host = null
+        overlayHost.destroy()
+        onDismissed()
     }
 }

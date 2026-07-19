@@ -4,6 +4,7 @@ import android.accessibilityservice.AccessibilityService
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.graphics.Rect
 import android.os.Bundle
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -32,7 +33,7 @@ class WingmanAccessibilityService : AccessibilityService() {
     /** 把回覆填進當前聊天輸入框。回傳是否成功。 */
     fun fillReply(text: String): Boolean {
         val root = rootInActiveWindow ?: return false
-        val field = findEditable(root) ?: return false
+        val field = pickInputField(root) ?: return false
 
         // 1) 優先 ACTION_SET_TEXT
         val args = Bundle().apply {
@@ -47,14 +48,28 @@ class WingmanAccessibilityService : AccessibilityService() {
         return field.performAction(AccessibilityNodeInfo.ACTION_PASTE)
     }
 
-    /** 深度優先找第一個可編輯節點（通常就是聊天輸入框）。 */
-    private fun findEditable(node: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
-        if (node == null) return null
-        if (node.isEditable && node.isEnabled) return node
-        for (i in 0 until node.childCount) {
-            findEditable(node.getChild(i))?.let { return it }
+    /**
+     * 挑真正的聊天輸入框。實測（IG DM）：一個畫面可能有多個 EditText 節點，
+     * 含 2x2 像素的隱藏 decoy，直接取第一個會填錯。策略：
+     * 1) 優先取「已聚焦的輸入節點」（使用者點過輸入框時最準）
+     * 2) 否則收集所有可編輯節點，取「可見且面積最大」者（通常就是訊息輸入框）
+     */
+    private fun pickInputField(root: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)?.let {
+            if (it.isEditable && it.isEnabled) return it
         }
-        return null
+        val candidates = ArrayList<AccessibilityNodeInfo>()
+        collectEditable(root, candidates)
+        val visible = candidates.filter { it.isVisibleToUser && it.isEnabled }
+        return (visible.ifEmpty { candidates }).maxByOrNull { node ->
+            val r = Rect(); node.getBoundsInScreen(r); r.width().toLong() * r.height()
+        }
+    }
+
+    private fun collectEditable(node: AccessibilityNodeInfo?, out: MutableList<AccessibilityNodeInfo>) {
+        if (node == null) return
+        if (node.isEditable) out.add(node)
+        for (i in 0 until node.childCount) collectEditable(node.getChild(i), out)
     }
 
     companion object {
