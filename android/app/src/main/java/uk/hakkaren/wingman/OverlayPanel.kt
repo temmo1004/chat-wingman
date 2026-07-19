@@ -1,57 +1,68 @@
 package uk.hakkaren.wingman
 
 import android.content.Context
-import android.graphics.PixelFormat
-import android.view.Gravity
-import android.view.LayoutInflater
-import android.view.View
-import android.view.WindowManager
-import android.widget.LinearLayout
-import android.widget.TextView
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import uk.hakkaren.wingman.ui.OverlayUiState
+import uk.hakkaren.wingman.ui.WingmanOverlayPanel
+import uk.hakkaren.wingman.ui.WingmanTheme
 
 /**
- * 球展開的回覆面板：聊死指數 + 三張風格卡片。點卡片回呼 onPick。
- * 用 classic Views（overlay 內 Compose 生命週期較麻煩，骨架先求穩）。
+ * 真實浮動面板的 Compose host。FLAG_NOT_FOCUSABLE 讓 Accessibility 仍能取得聊天 App。
  */
 class OverlayPanel(
     private val ctx: Context,
-    private val onPick: (Reply) -> Unit,
+    private val onFill: (Reply) -> Unit,
+    private val onCopy: (Reply) -> Unit,
+    private val onRefresh: () -> Unit,
+    private val onDismissed: () -> Unit,
 ) {
-    private val wm = ctx.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-    private var root: View? = null
+    private var state by mutableStateOf<OverlayUiState>(OverlayUiState.Loading)
+    private var host: OverlayComposeHost? = null
+
+    fun showLoading() {
+        state = OverlayUiState.Loading
+        ensureShown()
+    }
 
     fun show(result: WingmanResult) {
-        val view = LayoutInflater.from(ctx).inflate(R.layout.panel, null)
+        state = OverlayUiState.Success(result)
+        ensureShown()
+    }
 
-        view.findViewById<TextView>(R.id.deathIndex).text =
-            "聊死指數 ${result.chatDeathIndex}"
-        view.findViewById<TextView>(R.id.context).text = result.context
+    fun showError(message: String) {
+        state = OverlayUiState.Error(message)
+        ensureShown()
+    }
 
-        val list = view.findViewById<LinearLayout>(R.id.cards)
-        result.replies.forEach { reply ->
-            val card = LayoutInflater.from(ctx).inflate(R.layout.reply_card, list, false)
-            card.findViewById<TextView>(R.id.style).text = reply.style
-            card.findViewById<TextView>(R.id.text).text = reply.text
-            card.findViewById<TextView>(R.id.why).text = "軍師：${reply.why}"
-            card.setOnClickListener { onPick(reply) }
-            list.addView(card)
+    private fun ensureShown() {
+        if (host != null) return
+        val overlayHost = OverlayComposeHost(ctx)
+        host = overlayHost
+        try {
+            overlayHost.show {
+                WingmanTheme {
+                    WingmanOverlayPanel(
+                        state = state,
+                        onFill = onFill,
+                        onCopy = onCopy,
+                        onDismiss = ::dismiss,
+                        onRefresh = onRefresh,
+                    )
+                }
+            }
+        } catch (error: Throwable) {
+            host = null
+            overlayHost.destroy()
+            throw error
         }
-        view.findViewById<View>(R.id.close).setOnClickListener { dismiss() }
-
-        val lp = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-            PixelFormat.TRANSLUCENT,
-        ).apply { gravity = Gravity.BOTTOM }
-
-        root = view
-        wm.addView(view, lp)
     }
 
     fun dismiss() {
-        root?.let { runCatching { wm.removeView(it) } }
-        root = null
+        val overlayHost = host ?: return
+        host = null
+        overlayHost.destroy()
+        onDismissed()
     }
 }
